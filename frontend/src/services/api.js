@@ -1,16 +1,15 @@
-// src/services/api.js
 import axios from "axios";
 
 // ✅ Use environment variable for backend URL
 const API = axios.create({
-  baseURL: import.meta.env.VITE_BACKEND_URL, // automatically points to Render backend in production
+  baseURL: import.meta.env.VITE_BACKEND_URL, // points to Render backend
   withCredentials: true, // send cookies if needed
 });
 
 // ✅ AI Suggestion function
 export const getAISuggestion = async (code, language = "javascript") => {
   try {
-    const response = await API.post("/safe-suggest", { code, language });
+    const response = await API.post("/api/safe-suggest", { code, language }); // <-- added /api
     return response.data;
   } catch (error) {
     console.error("Error fetching AI suggestion:", error);
@@ -19,10 +18,10 @@ export const getAISuggestion = async (code, language = "javascript") => {
 };
 
 // ✅ Get user's AI suggestions for dashboard
-export const getSuggestions = async (page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc') => {
+export const getSuggestions = async (page = 1, limit = 10, sortBy = "createdAt", sortOrder = "desc") => {
   try {
-    const response = await API.get("/suggestions", {
-      params: { page, limit, sortBy, sortOrder }
+    const response = await API.get("/api/suggestions", {
+      params: { page, limit, sortBy, sortOrder },
     });
     return response.data;
   } catch (error) {
@@ -34,7 +33,7 @@ export const getSuggestions = async (page = 1, limit = 10, sortBy = 'createdAt',
 // ✅ Get suggestion statistics
 export const getSuggestionStats = async () => {
   try {
-    const response = await API.get("/suggestions/stats");
+    const response = await API.get("/api/suggestions/stats");
     return response.data;
   } catch (error) {
     console.error("Error fetching suggestion stats:", error);
@@ -45,7 +44,7 @@ export const getSuggestionStats = async () => {
 // ✅ Get specific suggestion details
 export const getSuggestionById = async (id) => {
   try {
-    const response = await API.get(`/suggestions/${id}`);
+    const response = await API.get(`/api/suggestions/${id}`);
     return response.data;
   } catch (error) {
     console.error("Error fetching suggestion:", error);
