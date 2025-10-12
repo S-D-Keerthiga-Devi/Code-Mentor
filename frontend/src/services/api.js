@@ -1,9 +1,9 @@
 // src/services/api.js
 import axios from "axios";
 
-// ✅ Create axios instance
+// ✅ Use environment variable for backend URL
 const API = axios.create({
-  baseURL: "http://localhost:5000/api", // your backend URL
+  baseURL: import.meta.env.VITE_BACKEND_URL, // automatically points to Render backend in production
   withCredentials: true, // send cookies if needed
 });
 
@@ -52,9 +52,3 @@ export const getSuggestionById = async (id) => {
     throw error;
   }
 };
-
-// ✅ You can add other API calls here
-// export const loginUser = async (data) => {
-//   const response = await API.post("/auth/login", data);
-//   return response.data;
-// };
