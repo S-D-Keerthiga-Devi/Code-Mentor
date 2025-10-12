@@ -1,9 +1,13 @@
 import { createSlice } from "@reduxjs/toolkit";
 
+const userFromStorage = localStorage.getItem("userData")
+  ? JSON.parse(localStorage.getItem("userData"))
+  : null;
+
 const initialState = {
-    status: false,
-    userData: null
-}
+    status: !!userFromStorage,
+    userData: userFromStorage
+};
 
 const authSlice = createSlice({
     name: "auth",
@@ -16,6 +20,8 @@ const authSlice = createSlice({
         logout: (state) => {
             state.status = false,
             state.userData = null
+            localStorage.removeItem("token");
+            localStorage.removeItem("userData");
         },
         updateUser: (state, action) => {
             state.userData = {

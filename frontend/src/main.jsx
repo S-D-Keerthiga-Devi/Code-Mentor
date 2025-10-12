@@ -13,6 +13,7 @@ import store from './store/store'
 import { Provider } from 'react-redux'
 import { ToastContainer, toast } from 'react-toastify'
 import Dashboard from './pages/Dashboard'
+import SafeSuggest from './pages/SafeSuggest'
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -22,6 +23,7 @@ const router = createBrowserRouter(
       <Route path='email-verify' element={<EmailVerify/>}/>
       <Route path='reset-password' element={<ResetPassword/>}/>
       <Route path='dashboard' element={<Dashboard/>}/>
+      <Route path='safe-suggest' element={<SafeSuggest/>}/>
     </Route>
   )
 )

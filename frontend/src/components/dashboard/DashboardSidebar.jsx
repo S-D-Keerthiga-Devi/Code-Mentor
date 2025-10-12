@@ -1,8 +1,19 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function DashboardSidebar() {
+  const navigate = useNavigate();
   return (
     <aside className="w-64 bg-white shadow-lg p-6 hidden md:block">
+      <h1 className="text-xl md:text-2xl font-bold text-gray-900 leading-tight mb-5">
+        <span
+          onClick={() => navigate('/')}
+          className="text-indigo-600 cursor-pointer"
+        >
+          CodeMentor
+        </span>
+      </h1>
+
       <nav className="space-y-4">
         <a href="#stats" className="block font-medium hover:text-indigo-600">
           Stats
