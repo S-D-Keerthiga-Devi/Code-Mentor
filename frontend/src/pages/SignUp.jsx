@@ -1,17 +1,17 @@
 import React from "react";
-import { SignIn } from "@clerk/clerk-react";
+import { SignUp } from "@clerk/clerk-react";
 
-const Login = () => {
+const SignUpPage = () => {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-            <SignIn
+            <SignUp
                 routing="path"
-                path="/login"
-                signUpUrl="/sign-up"
+                path="/sign-up"
+                signInUrl="/login"
                 forceRedirectUrl="/auth-callback"
             />
         </div>
     );
 };
 
-export default Login;
+export default SignUpPage;

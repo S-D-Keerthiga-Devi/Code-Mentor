@@ -13,8 +13,10 @@ const SafeSuggest = () => {
     // Check if user is authenticated
     const token = localStorage.getItem("token");
     if (!status && !token) {
-      navigate('/login', { 
-        state: { 
+      // Store redirect intent
+      sessionStorage.setItem('redirectAfterLogin', '/safe-suggest');
+      navigate('/login', {
+        state: {
           message: 'Please login to access the Smart Code Assistant',
           redirectTo: '/safe-suggest'
         }

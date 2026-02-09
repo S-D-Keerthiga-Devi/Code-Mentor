@@ -7,3 +7,10 @@
 *{
     font-family: "Outfit", sans-serif;
 }
+
+/* Print rules: hide global chrome, show only document */
+@media print {
+  nav, header, footer, .site-header, .site-footer, .print\:hidden { display: none !important; }
+  .agreement-document { margin: 0 !important; padding: 0.75in !important; }
+  body { background: #fff !important; }
+}
