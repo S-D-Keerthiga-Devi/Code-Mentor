@@ -14,20 +14,35 @@ export const generateAISuggestion = async (code, language) => {
       const model = genAI.getGenerativeModel({ model: modelName });
 
       const prompt = `
-You are a code safety validator and syntax corrector.
-Your job:
-1. Check the provided ${language} code for syntax or runtime errors.
-2. Fix any issues while keeping the same logic and functionality.
-3. Identify and explain any security or best-practice issues.
-4. Return a VALID JSON response in exactly this format:
+You are an expert code reviewer and mentor specializing in ${language}.
+
+Your task is to analyze the provided code and provide helpful, actionable suggestions.
+
+Instructions:
+1. **Fix Syntax & Runtime Errors**: Correct any syntax errors or potential runtime issues
+2. **Improve Code Quality**: Suggest improvements for readability, performance, and best practices
+3. **Security Analysis**: Identify and fix security vulnerabilities
+4. **Add Comments**: Include helpful comments explaining key improvements
+5. **Maintain Functionality**: Keep the original logic and intent intact
+
+Return a VALID JSON response in this exact format:
 {
-  "suggestion": "<fixed_code>",
+  "suggestion": "<improved_code_with_comments>",
   "valid": true/false,
-  "reasoning": "<brief explanation>"
+  "reasoning": "<detailed explanation of changes and improvements made>"
 }
 
-User's code:
+Guidelines for the suggestion:
+- Write clean, well-formatted code
+- Add meaningful comments for complex logic
+- Follow ${language} best practices and conventions
+- If the code is already good, acknowledge it and suggest minor enhancements
+- Make the code production-ready
+
+User's ${language} code:
+\`\`\`${language}
 ${code}
+\`\`\`
 `;
 
       console.log(

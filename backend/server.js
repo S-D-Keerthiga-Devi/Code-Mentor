@@ -9,6 +9,8 @@ import authRouter from "./routes/authRoutes.js";
 import userRouter from "./routes/userRoutes.js";
 import safeSuggestRouter from "./routes/safeSuggest.js"; // ✅ Added
 import suggestionsRouter from "./routes/suggestions.js"; // ✅ Added
+import courseMaterialRouter from "./routes/courseMaterialRoutes.js"; // ✅ Added
+import userRoleRouter from "./routes/userRoleRoutes.js"; // ✅ Added
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -41,6 +43,8 @@ connectDB()
     app.use("/api/user", userRouter);
     app.use("/api/safe-suggest", safeSuggestRouter); // ✅ New route
     app.use("/api/suggestions", suggestionsRouter); // ✅ New route
+    app.use("/api/course-materials", courseMaterialRouter); // ✅ Course Materials route
+    app.use("/api/user-role", userRoleRouter); // ✅ User Role route
 
     // Global error handler (optional)
     app.use((err, req, res, next) => {
