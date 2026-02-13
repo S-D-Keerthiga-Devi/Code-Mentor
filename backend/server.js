@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import connectDB from "./config/mongodb.js";
+import http from "http";
 
 // Routers
 import authRouter from "./routes/authRoutes.js";
@@ -11,9 +12,17 @@ import safeSuggestRouter from "./routes/safeSuggest.js"; // ✅ Added
 import suggestionsRouter from "./routes/suggestions.js"; // ✅ Added
 import courseMaterialRouter from "./routes/courseMaterialRoutes.js"; // ✅ Added
 import userRoleRouter from "./routes/userRoleRoutes.js"; // ✅ Added
+import collaborationRoutes from './routes/collaborationRoutes.js'; // ✅ Added
+import aiRouter from "./routes/aiRoutes.js"; // ✅ Added
+
+import { initializeSocket } from './socket/socketManager.js'; // ✅ Added
 
 const app = express();
 const port = process.env.PORT || 5000;
+const server = http.createServer(app); // ✅ Modified
+
+// Initialize Socket.io
+const io = initializeSocket(server); // ✅ Added
 
 // ✅ Define allowed frontend origins
 const allowedOrigins = ["http://localhost:5173", "http://localhost:5174", "https://code-mentor-delta.vercel.app"];
@@ -45,6 +54,7 @@ connectDB()
     app.use("/api/suggestions", suggestionsRouter); // ✅ New route
     app.use("/api/course-materials", courseMaterialRouter); // ✅ Course Materials route
     app.use("/api/user-role", userRoleRouter); // ✅ User Role route
+    app.use("/api/ai", aiRouter); // ✅ AI route
 
     // Global error handler (optional)
     app.use((err, req, res, next) => {
@@ -53,7 +63,8 @@ connectDB()
     });
 
     // ✅ Start server
-    app.listen(port, () =>
+    // ✅ Start server
+    server.listen(port, () =>
       console.log(`🌐 Server running on http://localhost:${port}`)
     );
   })

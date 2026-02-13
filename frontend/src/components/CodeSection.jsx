@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useUser } from "@clerk/clerk-react";
 import Editor from "@monaco-editor/react";
 import { getAISuggestion } from "../services/api";
 import SuggestionCard from "./SuggestionCard";
@@ -12,6 +13,7 @@ const CodeSection = () => {
   const [error, setError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
+  const { user } = useUser();
 
   const exampleCode = {
     javascript: `// Example: Sort an array of numbers
@@ -34,26 +36,15 @@ def factorial(n):
     setShowSuccess(false);
 
     try {
-      const data = await getAISuggestion(code, language);
+      const data = await getAISuggestion(code, language, user?.id);
       setSuggestion(data);
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
       console.error("Error:", err);
 
-      if (err.response?.status === 401 || err.response?.data?.message?.includes("Not Authorized")) {
-        setError("Session expired. Please login again.");
-        setTimeout(() => {
-          navigate('/login', {
-            state: {
-              message: 'Please login to continue using the Smart Code Assistant',
-              redirectTo: '/safe-suggest'
-            }
-          });
-        }, 2000);
-      } else {
-        setError("Failed to get AI suggestion. Please try again.");
-      }
+      // Removed 401 redirect logic as we are now using Clerk ID directly
+      setError("Failed to get AI suggestion. Please try again.");
     } finally {
       setLoading(false);
     }

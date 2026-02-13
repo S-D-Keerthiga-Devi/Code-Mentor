@@ -3,10 +3,11 @@ import {
   ShieldCheck,
   BookOpen,
   Bug,
-  GraduationCap,
   BarChart3,
   Lock,
-  Sparkles
+  Sparkles,
+  Users, // Added Users icon
+  GraduationCap // Added GraduationCap icon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
@@ -25,6 +26,10 @@ const ServicesSection = () => {
       navigate('/safe-suggest');
     } else if (serviceId === 2) {
       navigate("/auth-callback");
+    } else if (serviceId === 7) {
+      // Generate a random room ID for collaboration
+      const roomId = Math.random().toString(36).substring(2, 7);
+      navigate(`/collab/${roomId}`);
     }
   };
 
@@ -44,6 +49,14 @@ const ServicesSection = () => {
       icon: BookOpen,
       status: "active",
       color: "blue"
+    },
+    {
+      id: 7,
+      title: "Real-Time Collaboration",
+      description: "Code together in real-time with peers. Share your editor and solve problems instantly.",
+      icon: Users,
+      status: "active",
+      color: "orange"
     },
     {
       id: 3,
@@ -86,7 +99,8 @@ const ServicesSection = () => {
       purple: active ? 'from-purple-500 to-purple-600' : 'bg-purple-100 text-purple-600',
       pink: active ? 'from-pink-500 to-pink-600' : 'bg-pink-100 text-pink-600',
       green: active ? 'from-green-500 to-green-600' : 'bg-green-100 text-green-600',
-      red: active ? 'from-red-500 to-red-600' : 'bg-red-100 text-red-600'
+      red: active ? 'from-red-500 to-red-600' : 'bg-red-100 text-red-600',
+      orange: active ? 'from-orange-500 to-orange-600' : 'bg-orange-100 text-orange-600'
     };
     return colors[color] || colors.indigo;
   };
@@ -125,8 +139,8 @@ const ServicesSection = () => {
 
                 <div className="p-6">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${isActive
-                      ? `bg-gradient-to-br ${getColorClasses(service.color, true)} text-white`
-                      : getColorClasses(service.color, false)
+                    ? `bg-gradient-to-br ${getColorClasses(service.color, true)} text-white`
+                    : getColorClasses(service.color, false)
                     }`}>
                     <IconComponent className="w-6 h-6" />
                   </div>

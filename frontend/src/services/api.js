@@ -7,9 +7,9 @@ const API = axios.create({
 });
 
 // ✅ AI Suggestion function
-export const getAISuggestion = async (code, language = "javascript") => {
+export const getAISuggestion = async (code, language = "javascript", userId = null) => {
   try {
-    const response = await API.post("/api/safe-suggest", { code, language }); // <-- added /api
+    const response = await API.post("/api/safe-suggest", { code, language, userId }); // <-- added /api
     return response.data;
   } catch (error) {
     console.error("Error fetching AI suggestion:", error);

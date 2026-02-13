@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import dotenv from "dotenv";
-dotenv.config({ path: 'backend/.env' });
+dotenv.config();
 
 const listModels = async () => {
     if (!process.env.GEMINI_API_KEY) {

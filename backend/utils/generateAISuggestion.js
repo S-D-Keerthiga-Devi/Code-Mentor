@@ -5,7 +5,7 @@ dotenv.config();
 
 export const generateAISuggestion = async (code, language) => {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const models = ["gemini-2.5-flash", "gemini-1.5-flash"]; // priority list
+  const models = ["gemini-2.5-flash", "gemini-2.0-flash"]; // priority list
 
   for (const modelName of models) {
     try {
