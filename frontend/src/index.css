@@ -14,3 +14,26 @@
   .agreement-document { margin: 0 !important; padding: 0.75in !important; }
   body { background: #fff !important; }
 }
+
+/* Yjs Remote Cursors & Selections */
+.yRemoteSelection {
+    opacity: 0.5;
+}
+
+.yRemoteSelectionHead {
+    position: absolute;
+    border-left: orange solid 2px;
+    border-top: orange solid 2px;
+    border-bottom: orange solid 2px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.yRemoteSelectionHead::after {
+    position: absolute;
+    content: ' ';
+    border: 3px solid orange;
+    border-radius: 4px;
+    left: -4px;
+    top: -5px;
+}

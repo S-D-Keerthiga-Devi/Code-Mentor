@@ -17,22 +17,29 @@
 
 ## Features
 
-- **Authentication**: Secure sign-up and login system for users.  
-- **Interactive Learning**: Provides coding exercises with AI-assisted hints.  
-- **Real-time Feedback**: Validates code submissions and provides instant feedback.  
-- **Gamification**: Tracks progress and motivates users through badges and points.  
-- **Admin Dashboard**: Manage users, monitor progress, and set coding challenges.  
-- **Notifications**: Custom notifications for achievements and deadlines.  
+- **Authentication**: Secure sign-up and login system for users via Clerk & Firebase.
+- **Real-time Collaboration**:
+    -   **Code Editor**: Collaborative coding with syntax highlighting (Monaco Editor) and live cursor tracking (Yjs).
+    -   **Whiteboard**: Shared drawing canvas for brainstorming ideas.
+    -   **Chat**: Integrated room chat with slash commands.
+- **AI Assistance**:
+    -   **AI Chat**: Built-in AI Mentor accessible via `/ai [question]` command in chat.
+    -   **Smart Suggestions**: AI-powered code improvements and explanations.
+- **Code Execution**: Run JavaScript, Python, and C++ code directly in the browser (powered by Piston API).
+- **Responsive Design**: Fully optimized for desktop, tablet, and mobile devices with collapsible drawers and overlays.
+- **Gamification**: Tracks progress and motivates users through badges and points.
+- **Admin Dashboard**: Manage users, monitor progress, and set coding challenges.
 
 
 ## Tech Stack
 
-- **Frontend**: React, React Native  
-- **Backend**: Node.js, Express.js  
-- **Database**: MongoDB  
-- **Authentication**: Firebase Authentication  
-- **Maps & Geolocation**: Mapbox, Leaflet, Google Maps  
-- **State Management**: Redux Toolkit  
+- **Frontend**: React, Tailwind CSS, Monaco Editor
+- **Backend**: Node.js, Express.js, Socket.io
+- **Database**: MongoDB
+- **Collaboration**: Yjs, y-websocket, y-indexeddb
+- **AI & Execution**: Gemini API, Piston API
+- **Authentication**: Clerk, Firebase
+- **State Management**: Redux Toolkit
 
 
 ## Project Structure

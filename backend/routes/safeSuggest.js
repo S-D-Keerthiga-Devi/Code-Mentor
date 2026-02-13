@@ -8,8 +8,8 @@ import userAuth from "../middleware/userAuth.js";
 
 const router = express.Router();
 
-// ✅ POST /api/safe-suggest (requires authentication)
-router.post("/", rateLimiter, userAuth, async (req, res) => {
+// ✅ POST /api/safe-suggest (Clerk ID passed in body)
+router.post("/", rateLimiter, async (req, res) => {
   try {
     const { code, language, userId } = req.body;
 
@@ -42,7 +42,7 @@ router.post("/", rateLimiter, userAuth, async (req, res) => {
 
     // 🗂️ Step 5 — Log in MongoDB
     await SuggestionLog.create({
-      userId: req.user.id, // Use authenticated user ID or null for guests
+      userId: userId || null, // Use provided userId or null
       codeContext: code,
       suggestion: aiCode, // Store only the code string
       language,

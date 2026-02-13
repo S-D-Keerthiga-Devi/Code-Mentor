@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev:frontend": "vite",
+    "dev:sync": "y-websocket",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:sync\"",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "sync-server": "y-websocket"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.57.0",
@@ -15,15 +18,24 @@
     "@monaco-editor/react": "^4.7.0",
     "@reduxjs/toolkit": "^2.9.0",
     "axios": "^1.11.0",
+    "framer-motion": "^12.34.0",
     "lucide-react": "^0.543.0",
+    "monaco-editor": "^0.55.1",
     "react": "^19.1.1",
+    "react-canvas-draw": "^1.2.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.8.2",
-    "react-toastify": "^11.0.5"
+    "react-toastify": "^11.0.5",
+    "socket.io-client": "^4.8.3",
+    "y-indexeddb": "^9.0.12",
+    "y-monaco": "^0.1.6",
+    "y-webrtc": "^10.3.0",
+    "y-websocket": "^1.5.4",
+    "yjs": "^13.6.29"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
@@ -31,6 +43,8 @@
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.21",
+    "baseline-browser-mapping": "^2.9.19",
+    "concurrently": "^9.2.1",
     "eslint": "^9.33.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
