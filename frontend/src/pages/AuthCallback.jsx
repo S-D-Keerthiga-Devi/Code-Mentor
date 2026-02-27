@@ -28,7 +28,9 @@ const AuthCallback = () => {
                 }
 
                 try {
-                    const response = await axios.get(`http://localhost:5000/api/user-role/role/${user.id}`);
+                    const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress;
+                    const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+                    const response = await axios.get(`${backendUrl}/api/user-role/role/${user.id}?email=${userEmail}`);
                     const role = response.data.role;
 
                     localStorage.setItem("userRole", role);

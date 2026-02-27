@@ -113,6 +113,28 @@ const CollaborationRoom = () => {
             color: randomColor,
         });
 
+        // 6. Interaction Logging Helper
+        const logInteraction = async (actionType, metadata = {}) => {
+            try {
+                await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/ai/log`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sessionId: roomId,
+                        actionType,
+                        metadata
+                    })
+                });
+            } catch (error) {
+                console.error("Failed to log interaction:", error);
+            }
+        };
+
+        // 7. Detect Paste Events
+        editor.onDidPaste((e) => {
+            logInteraction("code_paste", { range: e.range });
+        });
+
     }, [roomId, userName]);
 
     // Cleanup Yjs on Unmount
@@ -151,11 +173,44 @@ const CollaborationRoom = () => {
         setShowTerminal(true); // Auto-open terminal
         setOutput("Running...");
 
-        // Map language for Piston API
+        // Client-side Execution for JavaScript
+        if (language === "javascript") {
+            try {
+                let capturedOutput = [];
+                const customConsole = {
+                    log: (...args) => {
+                        capturedOutput.push(args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(" "));
+                    },
+                    error: (...args) => {
+                        capturedOutput.push("Error: " + args.map(a => String(a)).join(" "));
+                    },
+                    warn: (...args) => {
+                        capturedOutput.push("Warning: " + args.map(a => String(a)).join(" "));
+                    }
+                };
+
+                // Wrap execution in a Promise to handle potential async code (basic support)
+                // Note: This is a basic isolation. For production, consider Web Workers or dedicated sandboxes.
+                const runUserCode = new Function("console", code);
+
+                runUserCode(customConsole);
+
+                setOutput(capturedOutput.length > 0 ? capturedOutput.join("\n") : "Code executed successfully (No output).");
+
+            } catch (error) {
+                console.error("Local Execution Error:", error);
+                setOutput(`Runtime Error: ${error.message}`);
+            } finally {
+                setIsRunning(false);
+            }
+            return;
+        }
+
+        // Server-side Execution for other languages (Piston API)
+        // Note: Piston Public API is restricted. In a real scenario, use a private instance or a key-based service (Judge0).
         let apiLanguage = language;
         let apiVersion = "*";
 
-        if (language === "javascript") { apiLanguage = "javascript"; apiVersion = "18.15.0"; }
         if (language === "python") { apiLanguage = "python"; apiVersion = "3.10.0"; }
         if (language === "cpp") { apiLanguage = "c++"; apiVersion = "10.2.0"; }
 
@@ -170,14 +225,15 @@ const CollaborationRoom = () => {
                 })
             });
 
-            const data = await response.json();
-
-            if (data.run) {
-                setOutput(data.run.output); // Piston returns combined stdout/stderr in 'output' usually, or separate
-                // If output is empty, check stderr specifically? Piston v2 usually puts everything in output or stdout/stderr.
-                // data.run.output is usually the combination.
+            if (response.status === 401 || response.status === 403) {
+                setOutput(`Error: The public code execution engine (Piston API) is currently unavailable (401 Unauthorized).\n\nPlease only run JavaScript code (which runs locally) or configure a self-hosted Piston instance or Judge0 API key.`);
             } else {
-                setOutput("Error: No output returned from execution engine.");
+                const data = await response.json();
+                if (data.run) {
+                    setOutput(data.run.output);
+                } else {
+                    setOutput(data.message || "Error: No output returned.");
+                }
             }
 
         } catch (error) {
@@ -187,6 +243,9 @@ const CollaborationRoom = () => {
             setIsRunning(false);
         }
     };
+
+    // AI Mode State
+    const [aiMode, setAiMode] = useState("Standard");
 
     return (
         <div className="flex flex-col h-screen bg-gray-100">
@@ -394,6 +453,7 @@ const CollaborationRoom = () => {
                                 <div className="absolute inset-y-0 right-0 w-full sm:w-96 md:w-full bg-white shadow-2xl md:shadow-none h-full flex flex-col border-l border-gray-200">
                                     <ChatSidebar
                                         roomId={roomId}
+                                        aiMode={aiMode}
                                         onClose={() => setShowChat(false)}
                                         onAiQuery={async (question) => {
                                             const editor = editorRef.current;
@@ -403,10 +463,16 @@ const CollaborationRoom = () => {
                                                 const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/ai/chat`, {
                                                     method: "POST",
                                                     headers: { "Content-Type": "application/json" },
-                                                    body: JSON.stringify({ code, language, question })
+                                                    body: JSON.stringify({ code, language, question, sessionId: roomId }) // Pass sessionId
                                                 });
                                                 const data = await response.json();
-                                                return data.response;
+
+                                                // Update AI Mode from Backend Logic
+                                                if (data.mode) {
+                                                    setAiMode(data.mode);
+                                                }
+
+                                                return data.reply || data.response; // Handle both simplified/old format if needed
                                             } catch (e) {
                                                 console.error("AI Chat Error", e);
                                                 return "Sorry, I couldn't process that request right now.";

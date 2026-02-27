@@ -13,9 +13,10 @@ const RoleSelection = () => {
         if (!user) return;
 
         try {
-            await axios.post("http://localhost:5000/api/user-role/role", {
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+            await axios.post(`${backendUrl}/api/user-role/role`, {
                 clerkId: user.id,
-                email: user.primaryEmailAddress.emailAddress,
+                email: user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || "",
                 role: role,
             });
 
@@ -28,7 +29,8 @@ const RoleSelection = () => {
             }
         } catch (error) {
             console.error("Error saving role:", error);
-            toast.error("Failed to save role. Please try again.");
+            const errorMsg = error.response?.data?.error || "Failed to save role. Please try again.";
+            toast.error(errorMsg);
         }
     };
 
