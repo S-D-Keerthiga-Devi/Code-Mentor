@@ -39,6 +39,28 @@ export const analyzeSocraticHeatmap = async (code, language = "javascript", depe
   }
 };
 
+// ✅ Generate visual flow
+export const generateVisualFlowAPI = async (code, language = "javascript") => {
+  try {
+    const response = await API.post("/api/ai/visualize-flow", { code, language });
+    return response.data;
+  } catch (error) {
+    console.error("Error generating visual flow:", error);
+    throw error;
+  }
+};
+
+// ✅ Optimize specific AST node
+export const optimizeNodeCodeAPI = async (fullCode, lineNumber, language = "javascript") => {
+  try {
+    const response = await API.post("/api/ai/optimize-node", { fullCode, lineNumber, language });
+    return response.data;
+  } catch (error) {
+    console.error("Error optimizing node code:", error);
+    throw error;
+  }
+};
+
 // ✅ Execute code via Judge0
 export const executeJudge0 = async (code, language = "javascript") => {
   try {

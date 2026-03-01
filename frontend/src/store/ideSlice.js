@@ -37,6 +37,8 @@ const initialState = preloadedState || {
     chatMessages: [],
     isChatOpen: true,
     isTerminalOpen: true,
+    visualizerCode: '',
+    visualizerLanguage: 'javascript'
 };
 
 const ideSlice = createSlice({
@@ -90,6 +92,12 @@ const ideSlice = createSlice({
         },
         setIsTerminalOpen: (state, action) => {
             state.isTerminalOpen = action.payload;
+        },
+        setVisualizerCode: (state, action) => {
+            state.visualizerCode = action.payload;
+        },
+        setVisualizerLanguage: (state, action) => {
+            state.visualizerLanguage = action.payload;
         }
     }
 });
@@ -103,7 +111,9 @@ export const {
     setChatMessages,
     addChatMessage,
     setIsChatOpen,
-    setIsTerminalOpen
+    setIsTerminalOpen,
+    setVisualizerCode,
+    setVisualizerLanguage
 } = ideSlice.actions;
 
 export default ideSlice.reducer;

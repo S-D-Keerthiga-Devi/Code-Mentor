@@ -41,29 +41,40 @@
     - **Backend Workflow (Agentic AI Controller)**:
       1. The `analyzeCodeForHeatmap` controller receives the code, language, and dependency level.
       2. **Pedagogy Node**: The dependency level is dynamically translated into strict instructions (e.g., Red = "Pure Socratic. Analyze the time complexity...").
-      3. **Analysis Node**: A highly structured prompt is sent to `gemini-2.5-flash` demanding analysis of Performance, Security, and Best Practices flaws.
-      4. The Gemini Model generates the output, strictly constrained to `application/json` response MIME type.
-      5. The backend parses the JSON array and returns a standardized response containing the line number, smell type, severity, and the crafted Socratic hint.
+      3. **Analysis Node (Multi-Agent Architecture)**: The backend fans out three highly specialized prompts (AppSec Lead, Performance Architect, Tech Lead) to concurrent subagents using `Promise.all()`.
+      4. **Robust Fallbacks**: Each subagent attempts to use Gemini primary modeling, but falls back gracefully to Groq (`llama-3.3-70b-versatile`) on rate limits or failures using an `executeSubAgent` helper, safely returning `[]` to prevent crashes if all models fail.
+      5. **Aggregation & Deduplication**: The system aggregates the JSON arrays from all three subagents, standardizes them (parsing out Markdown schemas cleanly), and effectively deduplicates overlapping suggestions (same line and hint) before sending a clean payload to the client.
   - **Dependency Penalty Lightbulb** (Heuristic Auto-Fix):
     - When users click on a Socratic Heatmap wavy underline, a Monaco CodeActionProvider (Lightbulb) offers three actions.
     - Two actions display the hint or send it to chat, while the **⚠️ Auto-Fix** action uses the Agentic AI to surgically replace the single node/line containing the code smell.
     - **Dependency Penalty**: Accepting an auto-fix deducts 1 "Independent Developer Point" proactively by creating an `InteractionLog` entry (`actionType: "auto_fix_penalty"`), discouraging mindless code copying.
 
-### 4. Course Material & Smart Study
+### 4. Visual Debugger (Algorithmic Pulse)
+- **Tech Stack**: React Flow (`@xyflow/react`), Dagre Layout, Monaco Editor, React, Tailwind CSS.
+- **Backend Architecture**: Express controllers, Gemini/Groq AI graph compiler (`generateVisualFlow`).
+- **Functionality**:
+  - A dynamic, interactive 4D execution map that renders the logical flow of user code.
+  - **Auto-Layout**: Utilizes `dagre` to automatically calculate x/y coordinates for nodes, preventing visual overlapping of complex graphs.
+  - **Intelligent Nodes**: Node colors (`indigo`, `orange`, `red`) and drop shadows scale dynamically based on the Big-O Time Complexity score determined by the AI server.
+  - **Interactive Integration**: Clicking any node on the Visual Flow chart automatically scrolls and highlights the corresponding line of code in the adjacent Monaco Editor.
+  - **Dual Display Modes**: Segmented local state allowing users to easily pivot between a 50/50 "Split View" (Code + Graph) and a pristine "Full Canvas" mode strictly for massive algorithm viewing.
+  - **Scroll Isolation**: Custom configuration ensuring both the React Flow canvas (`panOnScroll={false}`) and Monaco editor (`handleMouseWheel: false`) smoothly pass wheel events to the global window, guaranteeing users never get trapped midway down the webpage.
+
+### 5. Course Material & Smart Study
 - **Tech Stack**: MongoDB, Multer, PDF-parse, Gemini AI.
 - **Functionality**:
   - **PDF Uploads**: Instructors can upload course materials (PDFs).
   - **Content Extraction**: The system extracts text from uploaded PDFs using `pdf-parse`.
   - **Context-Aware AI**: Students can ask questions, and the AI answers strictly based on the content of the uploaded course materials (Retrieved Augmented Generation - RAG).
 
-### 5. Code Execution Environment
+### 6. Code Execution Environment
 - **Tech Stack**: Node.js `child_process` (Local Execution), `xterm.js` (Frontend Terminal with `@xterm/addon-fit`).
 - **Functionality**:
   - Allows users to run JavaScript and Python snippets securely on the local backend engine via `child_process.exec`.
   - Features an integrated `xterm.js` terminal in `CodeSection.jsx` that dynamically outputs `stdout` success logs in green, and `stderr` or compile time execution errors in red.
   - Returns metadata stats like Execution Time and Code Status.
 
-### 6. Dashboard & UI
+### 7. Dashboard & UI
 - **Tech Stack**: React, Tailwind CSS, Framer Motion.
 - **Features**:
   - **Responsive Design**: Mobile-friendly layout with collapsible sidebars.
@@ -80,6 +91,7 @@
 - **State Management**: Redux Toolkit
 - **Routing**: React Router DOM v7
 - **Editor**: Monaco Editor (`@monaco-editor/react`)
+- **Graph Visualization**: React Flow (`@xyflow/react`), Dagre
 - **Real-time**: Socket.io-client, Yjs, Y-websocket
 - **Auth**: Clerk React SDK
 - **Data Fetching**: Axios
@@ -131,6 +143,13 @@ To test the adaptive AI modes:
 4.  **Expected**: The AI agent responds with JSON, applying colored wavy underlines (`.smell-performance`, `.smell-security`, `.smell-style`) to problematic lines. Hovering over the line reveals the Socratic Hint tailored to your selected dependency level.
 5.  **Bonus**: Click a wavy line. Click the Monaco Lightbulb 💡. Click **⚠️ Auto-Fix**. A toast will confirm a "-1 Point" deduction, and the line will be replaced with corrected code.
 
+### 5. Visual Debugger (Algorithmic Pulse)
+1.  Navigate to the Visual Debugger (`/visual-debugger`) either from the Home page or internal linking.
+2.  The Monaco editor on the left will pre-populate with the session code. Click **▶ Generate Pulse**.
+3.  **Expected**: The graph perfectly scales inside the right-hand canvas. Nodes are automatically arranged via `dagre` top-to-bottom.
+4.  **Interaction**: Click any node on the graph. The corresponding line of code in the Monaco Editor will aggressively highlight in Indigo. Click the node again to dismiss the highlight.
+5.  **Layout**: Toggle between **Split View** (50/50 Code/Graph) and **Full Canvas** (100% Graph view). Scroll natively down to the website footer regardless of mouse hover state.
+
 ## 📊 Feature Verification Status (Latest)
 
 | Feature | Status | Notes |
@@ -142,5 +161,6 @@ To test the adaptive AI modes:
 | **AI Chat** | ⚠️ Limited | Google Gemini Free Tier hits rate limits (429) quickly. Added graceful error handling & mock fallback. |
 | **Interaction Logs** | ✅ Working | Tracks `code_paste` events and deducts "Independent Developer Points" via `auto_fix_penalty` entries. |
 | **Socratic Heatmap** | ✅ Working | Agentic backend perfectly translates code smells to Socratic hints via Monaco deltaDecorations and HoverProviders. Supports Auto-Fix code actions. |
+| **Visual Debugger** | ✅ Working | AI fully parses AST logic and time complexity. Client successfully auto-layouts React Flow graph via `dagre`. Clean UI integration. |
 
 

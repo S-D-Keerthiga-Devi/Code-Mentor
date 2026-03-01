@@ -10,6 +10,7 @@ import StudentDashboard from "./pages/student/StudentDashboard";
 import InstructorDashboard from "./pages/instructor/InstructorDashboard";
 import InstructorMaterials from "./pages/instructor/InstructorMaterials";
 import StudentCourseBot from "./pages/student/StudentCourseBot";
+import VisualDebuggerLayout from "./components/VisualDebugger/VisualDebuggerLayout";
 
 // Import your Clerk Publishable Key
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -36,6 +37,20 @@ function App() {
                 <>
                   <SignedIn>
                     <RoleSelection />
+                  </SignedIn>
+                  <SignedOut>
+                    <RedirectToSignIn />
+                  </SignedOut>
+                </>
+              }
+            />
+
+            <Route
+              path="/visual-debugger"
+              element={
+                <>
+                  <SignedIn>
+                    <VisualDebuggerLayout />
                   </SignedIn>
                   <SignedOut>
                     <RedirectToSignIn />

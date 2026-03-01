@@ -4,6 +4,7 @@ import { generateAIExplanation } from "../utils/generateAIExplanation.js";
 import { getAiAssistance, logInteraction, autoFixCode } from "../controllers/aiController.js";
 import { analyzeCodeForHeatmap } from "../controllers/agenticAnalysisController.js";
 import { executeJudge0 } from "../controllers/executionController.js";
+import { generateVisualFlow, optimizeNodeCode } from "../controllers/visualDebuggerController.js";
 import rateLimiter from "../middleware/rateLimiter.js";
 
 const router = express.Router();
@@ -44,5 +45,11 @@ router.post("/execute-judge0", rateLimiter, executeJudge0);
 
 // POST /api/ai/auto-fix
 router.post("/auto-fix", rateLimiter, autoFixCode);
+
+// POST /api/ai/visualize-flow
+router.post("/visualize-flow", rateLimiter, generateVisualFlow);
+
+// POST /api/ai/optimize-node
+router.post("/optimize-node", rateLimiter, optimizeNodeCode);
 
 export default router;

@@ -9,7 +9,7 @@ const interactionLogSchema = new mongoose.Schema({
     actionType: {
         type: String,
         required: true,
-        enum: ["code_paste", "run_code", "copy_code", "ai_ask"], // Add other actions as needed
+        enum: ["code_paste", "run_code", "copy_code", "ai_ask", "auto_fix_penalty"], // Add other actions as needed
     },
     timeToAccept: {
         type: Number, // Time in seconds

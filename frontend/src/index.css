@@ -74,3 +74,8 @@
     word-break: break-all !important;
     white-space: pre-wrap !important;
 }
+
+/* Fix for React Flow Custom Node Tooltip overlap */
+.react-flow__node:hover {
+    z-index: 1000 !important;
+}

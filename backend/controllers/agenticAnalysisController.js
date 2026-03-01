@@ -193,6 +193,49 @@ const runGroqAnalysis = async (prompt) => {
     return responseText;
 };
 
+async function executeSubAgent(code, systemPrompt, agentName) {
+    let responseText = "";
+
+    try {
+        console.log(`🤖 [${agentName}] Attempting analysis with Gemini...`);
+        responseText = await runGeminiAnalysis(systemPrompt);
+    } catch (geminiError) {
+        console.warn(`⚠️ [${agentName}] Gemini Failed (${geminiError.message}). Falling back to Groq...`);
+        try {
+            console.log(`🧠 [${agentName}] Attempting analysis with Groq (Llama-3)...`);
+            responseText = await runGroqAnalysis(systemPrompt);
+        } catch (groqError) {
+            console.error(`❌ [${agentName}] Both Gemini and Groq failed.`);
+            return []; // Fails entirely, return []
+        }
+    }
+
+    let rawText = responseText.trim();
+    // Strip markdown formatting if the LLM ignored instructions
+    if (rawText.startsWith("```")) {
+        const lines = rawText.split('\n');
+        if (lines.length > 2) {
+            rawText = lines.slice(1, -1).join('\n').trim();
+        } else {
+            rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
+    }
+
+    try {
+        const parsedData = JSON.parse(rawText);
+        // LLMs may return { smells: [...] } or just an array directly due to different interpretations
+        if (parsedData.smells && Array.isArray(parsedData.smells)) {
+            return parsedData.smells;
+        } else if (Array.isArray(parsedData)) {
+            return parsedData;
+        }
+        return [];
+    } catch (parseError) {
+        console.error(`❌ [${agentName}] Failed to parse response as JSON:`, responseText);
+        return [];
+    }
+}
+
 export const analyzeCodeForHeatmap = async (req, res) => {
     const { code, language, dependencyLevel } = req.body;
 
@@ -213,79 +256,55 @@ export const analyzeCodeForHeatmap = async (req, res) => {
             pedagogyInstruction = "Direct hints. Example: 'You are missing a let keyword on line 4.'"; // Default
         }
 
-        const prompt = `
-You are an expert AI coding mentor. Your task is to perform an agentic analysis of the provided code and identify "Code Smells".
-You must analyze the code for three categories of smells:
-1. Performance (e.g., inefficient loops, poor data structure choices)
-2. Security (e.g., vulnerabilities, injection risks, hardcoded secrets)
-3. Best Practices (e.g., style, naming, deprecated functions, readability)
-
-Once you identify the smells, you must translate the "fix" into a "Socratic Question" based on the user's dependency level.
-The current user dependency pedagogy instruction is: ${pedagogyInstruction}
-
+        const basePrompt = `
 You can optionally use the \`test_code\` tool to run the code and check for compiler bugs or runtime issues before issuing your smells.
+The hint must follow this pedagogy instruction: ${pedagogyInstruction}
 
 Analyze this ${language || "code"}:
 \`\`\`${language || ""}
 ${code}
 \`\`\`
 
-You MUST return the final result EXACTLY as a strict JSON array wrapped in an object as shown below. No markdown formatting outside the JSON, no explanations. Just valid JSON.
+CRITICAL: You must return ONLY valid, raw JSON. Do NOT wrap the output in markdown blocks like \`\`\`json. Do not include any conversational text. Just the JSON array.`;
 
-### REQUIRED JSON OUTPUT FORMAT:
-{
-  "smells": [
-    {
-      "line": 4,
-      "type": "performance", // Strictly one of: "performance", "security", "style"
-      "severity": "warning", // "info", "warning", or "error"
-      "socraticHint": "The hint formulated according to the pedagogy instruction above."
-    }
-  ]
-}
+        const APPSEC_PROMPT = `You are an elite Application Security Lead. Your ONLY job is to find critical security vulnerabilities (SQLi, XSS, exposed secrets). You must ignore style, formatting, and performance entirely. Output a JSON array of objects with { line, type, message, severity: 'red', hint }. If no security issues exist, return [].\n` + basePrompt;
 
-CRITICAL: You must return ONLY valid, raw JSON. Do NOT wrap the output in markdown blocks like \`\`\`json. Do not include any conversational text. Just the JSON.
-`;
+        const PERFORMANCE_PROMPT = `You are a strict Systems Architect. Your ONLY job is to find performance bottlenecks, Big-O complexity issues, and memory leaks. Ignore security and style entirely. Output a JSON array of objects with { line, type, message, severity: 'yellow', hint }. If perfectly optimized, return [].\n` + basePrompt;
 
-        console.log(`🧠 AI Heatmap Analysis | Mode: ${dependencyLevel}`);
+        const TECH_LEAD_PROMPT = `You are a Senior Tech Lead. Your ONLY job is to enforce clean code, DRY principles, and proper variable naming. Ignore security and performance entirely. Output a JSON array of objects with { line, type, message, severity: 'green', hint }. If the code is perfectly clean, return [].\n` + basePrompt;
 
-        let responseText = "";
+        console.log(`🧠 AI Heatmap Analysis (Multi-Agent) | Mode: ${dependencyLevel}`);
 
-        try {
-            // Attempt 1: Gemini (Primary)
-            console.log("🤖 Attempting analysis with Gemini...");
-            responseText = await runGeminiAnalysis(prompt);
-        } catch (geminiError) {
-            console.warn(`⚠️ Gemini Failed (${geminiError.message}). Falling back to Groq...`);
+        const [securitySmells, performanceSmells, styleSmells] = await Promise.all([
+            executeSubAgent(code, APPSEC_PROMPT, "AppSec Lead"),
+            executeSubAgent(code, PERFORMANCE_PROMPT, "Performance Architect"),
+            executeSubAgent(code, TECH_LEAD_PROMPT, "Tech Lead")
+        ]);
 
-            try {
-                // Attempt 2: Groq (Secondary)
-                console.log("🧠 Attempting analysis with Groq (Llama-3)...");
-                responseText = await runGroqAnalysis(prompt);
-            } catch (groqError) {
-                console.error("❌ Both Gemini and Groq failed.");
-                throw new Error("All AI providers exhausted.");
-            }
-        }
+        const mapSmell = (smell) => {
+            const actualHint = smell.hint || smell.message || smell.socraticHint || "Review this line for improvements.";
+            return {
+                line: smell.line,
+                type: smell.type || "issue",
+                severity: smell.severity || "info",
+                message: actualHint, // Standardize to a single text field
+                socraticHint: actualHint
+            };
+        };
 
-        let rawText = responseText.trim();
-        // Strip markdown formatting if the LLM ignored instructions
-        if (rawText.startsWith("```")) {
-            const lines = rawText.split('\n');
-            rawText = lines.slice(1, -1).join('\n').trim();
-        }
+        const combinedSmells = [
+            ...securitySmells.map(mapSmell),
+            ...performanceSmells.map(mapSmell),
+            ...styleSmells.map(mapSmell)
+        ];
 
-        try {
-            const parsedData = JSON.parse(rawText);
-            // Ensure the structure is correct before sending
-            if (!parsedData.smells || !Array.isArray(parsedData.smells)) {
-                return res.status(200).json({ smells: [] }); // Safe fallback
-            }
-            return res.status(200).json(parsedData);
-        } catch (parseError) {
-            console.error("❌ Failed to parse response as JSON:", responseText);
-            return res.status(500).json({ error: "Invalid response format from AI." });
-        }
+        const uniqueSmells = combinedSmells.filter((smell, index, self) =>
+            index === self.findIndex((t) => (
+                t.line === smell.line && t.socraticHint === smell.socraticHint
+            ))
+        );
+
+        return res.status(200).json({ smells: uniqueSmells });
 
     } catch (error) {
         console.error("❌ Agentic Analysis Outer Error:", error);

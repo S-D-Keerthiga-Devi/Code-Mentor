@@ -4,6 +4,9 @@ import Editor from '@monaco-editor/react';
 import { toast } from 'react-toastify';
 import { analyzeSocraticHeatmap } from '../../services/api';
 import { VscPlay, VscBeaker, VscFiles, VscClose } from 'react-icons/vsc';
+import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { setVisualizerCode, setVisualizerLanguage } from '../../store/ideSlice';
 
 const EditorWorkspace = () => {
     const {
@@ -16,6 +19,9 @@ const EditorWorkspace = () => {
     } = useIDE();
 
     const refs = useRef({ sendToChat, executeAutoFix, activeFile });
+
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
 
     useEffect(() => {
         refs.current = { sendToChat, executeAutoFix, activeFile, editorInstance, monacoInstance, clearDecorations };
@@ -159,6 +165,16 @@ const EditorWorkspace = () => {
         window.dispatchEvent(runEvent);
     };
 
+    const handleVisualDebugger = () => {
+        if (!activeFile?.content.trim()) {
+            toast.warning("Please enter some code to visualize!");
+            return;
+        }
+        dispatch(setVisualizerCode(activeFile.content));
+        dispatch(setVisualizerLanguage(activeFile.language));
+        navigate('/visual-debugger');
+    };
+
     const handleAnalyzeHeatmap = async () => {
         if (!activeFile?.content.trim() || !editorInstance || !monacoInstance) {
             toast.warning("Please enter some code and ensure the editor is loaded!");
@@ -201,8 +217,7 @@ const EditorWorkspace = () => {
                 range: new monacoInstance.Range(smell.line, 1, smell.line, 1),
                 options: {
                     isWholeLine: true,
-                    className: colorClass,
-                    hoverMessage: { value: `### 🤖 Socratic Hint\n\n${smell.socraticHint}` }
+                    className: colorClass
                 }
             };
         });
@@ -294,6 +309,13 @@ const EditorWorkspace = () => {
                     >
                         <VscPlay size={14} />
                         <span>Run Code</span>
+                    </button>
+
+                    <button
+                        onClick={handleVisualDebugger}
+                        className="flex items-center space-x-1.5 px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-md transition shadow-sm font-medium tracking-wide"
+                    >
+                        <span>🎨 Send to Visual Debugger</span>
                     </button>
 
                     <button
