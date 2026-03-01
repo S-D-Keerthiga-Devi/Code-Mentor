@@ -26,6 +26,8 @@ const ServicesSection = () => {
       navigate('/safe-suggest');
     } else if (serviceId === 2) {
       navigate("/auth-callback");
+    } else if (serviceId === 3) {
+      navigate("/visual-debugger");
     } else if (serviceId === 7) {
       // Generate a random room ID for collaboration
       const roomId = Math.random().toString(36).substring(2, 7);
@@ -60,10 +62,10 @@ const ServicesSection = () => {
     },
     {
       id: 3,
-      title: "Visual Debugging Tools",
-      description: "Debug your code with animations, audio explanations, and interactive tools for better understanding.",
+      title: "Visual Debugger & Algorithmic Pulse",
+      description: "Don't just read about O(N²). Watch your data physically slow down in our 4D Big-O Execution Heatmap.",
       icon: Bug,
-      status: "coming-soon",
+      status: "active",
       color: "purple"
     },
     {

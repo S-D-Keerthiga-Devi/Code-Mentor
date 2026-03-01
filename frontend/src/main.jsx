@@ -24,6 +24,7 @@ import InstructorMaterials from './pages/instructor/InstructorMaterials'
 import StudentCourseBot from './pages/student/StudentCourseBot'
 import About from './pages/About'
 import CollaborationRoom from './components/Collaboration/CollaborationRoom';
+import VisualDebuggerLayout from './components/VisualDebugger/VisualDebuggerLayout';
 
 // Import your Clerk Publishable Key
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -90,6 +91,14 @@ const router = createBrowserRouter(
       <Route path='collab/:roomId' element={
         <>
           <SignedIn><CollaborationRoom /></SignedIn>
+          <SignedOut><RedirectToSignIn /></SignedOut>
+        </>
+      } />
+
+      {/* Visual Debugger Route */}
+      <Route path='visual-debugger' element={
+        <>
+          <SignedIn><VisualDebuggerLayout /></SignedIn>
           <SignedOut><RedirectToSignIn /></SignedOut>
         </>
       } />

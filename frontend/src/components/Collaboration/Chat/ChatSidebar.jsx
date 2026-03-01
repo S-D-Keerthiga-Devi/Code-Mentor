@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useCollaboration } from "../../../hooks/useCollaboration";
 import { Send, X } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
 
-const ChatSidebar = ({ roomId, onClose, onAiQuery }) => {
+const ChatSidebar = ({ roomId, onClose, onAiQuery, aiMode = 'Standard' }) => {
     const { chatMessages, sendChatMessage } = useCollaboration();
     const [newMessage, setNewMessage] = useState("");
     const messagesEndRef = useRef(null);
@@ -46,6 +47,39 @@ const ChatSidebar = ({ roomId, onClose, onAiQuery }) => {
         }
     };
 
+    const getModeBadge = () => {
+        switch (aiMode) {
+            case 'Socratic':
+                return (
+                    <div className="bg-red-50 border-b border-red-100 p-2 flex items-center justify-center space-x-2 text-red-700 text-xs font-semibold animate-pulse hover:animate-none group relative cursor-help">
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span>⛔ Dependency Detected: Socratic Mode</span>
+                        <div className="absolute top-full mt-1 hidden group-hover:block bg-gray-800 text-white text-[10px] p-2 rounded shadow-lg z-50 w-64 text-center">
+                            AI features are limited to encourage independent problem solving.
+                        </div>
+                    </div>
+                );
+            case 'Pseudocode':
+                return (
+                    <div className="bg-yellow-50 border-b border-yellow-100 p-2 flex items-center justify-center space-x-2 text-yellow-700 text-xs font-semibold group relative cursor-help">
+                        <span>⚠️</span>
+                        <span>Scaffolding: Logic Only</span>
+                        <div className="absolute top-full mt-1 hidden group-hover:block bg-gray-800 text-white text-[10px] p-2 rounded shadow-lg z-50 w-64 text-center">
+                            AI features are limited to encourage independent problem solving.
+                        </div>
+                    </div>
+                );
+            case 'Standard':
+            default:
+                return (
+                    <div className="bg-green-50 border-b border-green-100 p-2 flex items-center justify-center space-x-2 text-green-700 text-xs font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        <span>Mentor Mode: Active</span>
+                    </div>
+                );
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-white border-l border-gray-200 w-80 shadow-xl z-20">
             {/* Header */}
@@ -55,6 +89,8 @@ const ChatSidebar = ({ roomId, onClose, onAiQuery }) => {
                     <X size={18} />
                 </button>
             </div>
+            {/* AI Mode Badge */}
+            {getModeBadge()}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50/50">
@@ -71,21 +107,13 @@ const ChatSidebar = ({ roomId, onClose, onAiQuery }) => {
                             {isSystem ? (
                                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">{msg.message}</span>
                             ) : (
-                                <div className={`p-3 rounded-lg rounded-tl-none shadow-sm border max-w-[90%] ${msg.message.startsWith("🤖 **AI Mentor:**")
+                                <div className={`p-3 rounded-lg rounded-tl-none shadow-sm border max-w-[90%] overflow-x-auto ${msg.message.startsWith("🤖 **AI Mentor:**")
                                     ? "bg-indigo-50 border-indigo-200"
                                     : "bg-white border-gray-100"
                                     }`}>
                                     <p className="text-xs font-bold text-indigo-600 mb-0.5">{msg.username}</p>
-                                    <div className="text-sm text-gray-800 break-words whitespace-pre-wrap leading-relaxed">
-                                        {msg.message.split('\n').map((line, i) => (
-                                            <div key={i} className={`${line.trim().startsWith('-') || line.trim().startsWith('* ') ? 'pl-4' : ''} mb-1`}>
-                                                {line.split(/(\*\*.*?\*\*)/).map((part, j) =>
-                                                    part.startsWith('**') && part.endsWith('**')
-                                                        ? <strong key={j} className="font-semibold text-indigo-700">{part.slice(2, -2)}</strong>
-                                                        : part
-                                                )}
-                                            </div>
-                                        ))}
+                                    <div className="text-sm text-gray-800 break-words leading-relaxed prose prose-sm max-w-none">
+                                        <ReactMarkdown>{msg.message}</ReactMarkdown>
                                     </div>
                                     <span className="text-[10px] text-gray-400 block text-right mt-1">
                                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

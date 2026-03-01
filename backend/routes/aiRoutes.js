@@ -1,8 +1,11 @@
 // backend/routes/aiRoutes.js
 import express from "express";
 import { generateAIExplanation } from "../utils/generateAIExplanation.js";
+import { getAiAssistance, logInteraction, autoFixCode } from "../controllers/aiController.js";
+import { analyzeCodeForHeatmap } from "../controllers/agenticAnalysisController.js";
+import { executeJudge0 } from "../controllers/executionController.js";
+import { generateVisualFlow, optimizeNodeCode } from "../controllers/visualDebuggerController.js";
 import rateLimiter from "../middleware/rateLimiter.js";
-import userAuth from "../middleware/userAuth.js"; // Optional: if you want to protect it
 
 const router = express.Router();
 
@@ -29,28 +32,24 @@ router.post("/explain", rateLimiter, async (req, res) => {
 });
 
 // POST /api/ai/chat
-router.post("/chat", rateLimiter, async (req, res) => {
-    try {
-        const { code, language, question } = req.body;
+router.post("/chat", rateLimiter, getAiAssistance);
 
-        if (!question || !question.trim()) {
-            return res.status(400).json({ error: "No question provided." });
-        }
+// POST /api/ai/log
+router.post("/log", logInteraction);
 
-        // Import dynamically to avoid circular issues if any, or just import at top
-        const { generateAIChatResponse } = await import("../utils/generateAIChatResponse.js");
+// POST /api/ai/socratic-heatmap
+router.post("/socratic-heatmap", rateLimiter, analyzeCodeForHeatmap);
 
-        const result = await generateAIChatResponse(code || "", language || "text", question);
+// POST /api/ai/execute-judge0
+router.post("/execute-judge0", rateLimiter, executeJudge0);
 
-        return res.status(200).json(result);
+// POST /api/ai/auto-fix
+router.post("/auto-fix", rateLimiter, autoFixCode);
 
-    } catch (error) {
-        console.error("❌ AI Chat Error:", error);
-        return res.status(500).json({
-            error: "Failed to generate chat response",
-            details: error.message
-        });
-    }
-});
+// POST /api/ai/visualize-flow
+router.post("/visualize-flow", rateLimiter, generateVisualFlow);
+
+// POST /api/ai/optimize-node
+router.post("/optimize-node", rateLimiter, optimizeNodeCode);
 
 export default router;

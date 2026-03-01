@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import CodeSection from '../components/CodeSection';
+import CodeSection from "../components/CodeAssistant/CodeSection";
 
 const SafeSuggest = () => {
   const navigate = useNavigate();
