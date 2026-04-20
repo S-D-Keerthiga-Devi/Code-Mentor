@@ -4,6 +4,7 @@ import Groq from "groq-sdk";
 import { generateAIChatResponse } from "../utils/generateAIChatResponse.js";
 import { executeCodeTool } from "../utils/executeCodeTool.js";
 import { SOCRATIC_PROMPT, PSEUDOCODE_PROMPT, STANDARD_PROMPT } from "../utils/prompts.js";
+import axios from "axios";
 
 export const logInteraction = async (req, res) => {
     try {
@@ -370,3 +371,135 @@ Do NOT provide explanations.
         });
     }
 };
+
+export const triggerCourseGeneration = async (req, res) => {
+    try {
+        const { studentName, email, code, jdoodleError, experienceLevel } = req.body;
+
+        if (!code || !jdoodleError) {
+            return res.status(400).json({ error: "Missing required code or error fields." });
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ error: "GEMINI_API_KEY is missing." });
+        }
+
+        const courseTool = {
+            name: "provision_ephemeral_bootcamp",
+            description: "Generates a comprehensive study guide blueprint to help a student overcome a coding error.",
+            parameters: {
+                type: "OBJECT",
+                properties: {
+                    identified_weakness: { type: "STRING", description: "The underlying knowledge gap causing the error." },
+                    google_doc_title: { type: "STRING", description: "A catchy, encouraging title for the study guide." },
+                    Youtube_queries: { type: "ARRAY", items: { type: "STRING" }, description: "Search queries to find helpful YouTube videos." },
+                    article_search_queries: { type: "ARRAY", items: { type: "STRING" }, description: "Search queries to find helpful articles/documentation." },
+                    syllabus_outline: { type: "ARRAY", items: { type: "STRING" }, description: "Step-by-step topics the student should learn to master this concept." }
+                },
+                required: ["identified_weakness", "google_doc_title", "Youtube_queries", "article_search_queries", "syllabus_outline"]
+            }
+        };
+
+        const prompt = `You are a Senior Engineering Mentor.
+A student named ${studentName || "Anonymous"} with experience level '${experienceLevel || "beginner"}' has encountered an error in their code.
+
+Code:
+\`\`\`
+${code}
+\`\`\`
+
+Error Output:
+\`\`\`
+${jdoodleError}
+\`\`\`
+
+Your goal is to use the provided tool to generate a custom study guide blueprint to help them understand the root cause of their error and learn the underlying concepts.`;
+
+        let blueprint = null;
+
+        try {
+            // Primary route: Gemini function-calling
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const chat = model.startChat({
+                tools: [{ functionDeclarations: [courseTool] }]
+            });
+
+            const response = await chat.sendMessage(prompt);
+            const toolCall = response.response.functionCalls()?.[0];
+
+            if (!toolCall || toolCall.name !== "provision_ephemeral_bootcamp") {
+                throw new Error("Gemini failed to return the expected blueprint structure.");
+            }
+
+            blueprint = toolCall.args;
+        } catch (geminiError) {
+            console.warn("⚠️ Gemini failed, falling back to Groq...", geminiError.message);
+
+            const groqApiKey = process.env.GROQ_API_KEY;
+            if (!groqApiKey) {
+                throw new Error("GROQ_API_KEY is missing and Gemini failed.");
+            }
+
+            const groq = new Groq({ apiKey: groqApiKey });
+            const groqResponse = await groq.chat.completions.create({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an expert coding instructor. Analyze the student's failing code and produce a personalized remediation study guide blueprint. Return strictly valid JSON only (no markdown, no backticks, no extra text) that exactly matches this schema: {\"identified_weakness\":\"string\",\"google_doc_title\":\"string\",\"Youtube_queries\":[\"string\"],\"article_search_queries\":[\"string\"],\"syllabus_outline\":[\"string\"]}."
+                    },
+                    {
+                        role: "user",
+                        content: `Student Name: ${studentName || "Anonymous"}
+Experience Level: ${experienceLevel || "beginner"}
+
+Code:
+${code}
+
+Error Output:
+${jdoodleError}
+
+Generate the JSON blueprint now.`
+                    }
+                ],
+                temperature: 0.3
+            });
+
+            const groqRaw = groqResponse.choices?.[0]?.message?.content || "";
+            const cleanedResponse = groqRaw.replace(/```json/gi, "").replace(/```/g, "").trim();
+            const parsedGroqBlueprint = JSON.parse(cleanedResponse);
+
+            blueprint = parsedGroqBlueprint;
+        }
+        
+        // Post the blueprint mapping via axios to n8n webhook
+        const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || "YOUR_N8N_WEBHOOK_URL_HERE";
+        try {
+            const fallbackEmail = "admin@codementor.com"; // Fallback email
+            await axios.post(N8N_WEBHOOK_URL, {
+                studentName: studentName || "Anonymous",
+                email: email || fallbackEmail,
+                blueprint
+            });
+        } catch (webhookError) {
+            console.error("⚠️ Failed to trigger n8n webhook, but blueprint was generated:", webhookError.message);
+            // Optionally decide if this should fail the whole request. 
+            // Since it's an async background task usually, we just log it.
+        }
+
+        return res.status(200).json({ 
+            success: true, 
+            blueprint 
+        });
+
+    } catch (error) {
+        console.error("❌ Course Generation Error:", error);
+        return res.status(500).json({
+            error: "Failed to generate course blueprint",
+            details: error.message
+        });
+    }
+};
+

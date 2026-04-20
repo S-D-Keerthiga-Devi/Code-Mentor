@@ -1,9 +1,6 @@
-import { exec } from "child_process";
-import fs from "fs/promises";
-import path from "path";
-import os from "os";
+import axios from 'axios';
 
-export const executeJudge0 = async (req, res) => {
+export const executeCode = async (req, res) => {
     try {
         const { code, language } = req.body;
 
@@ -11,79 +8,51 @@ export const executeJudge0 = async (req, res) => {
             return res.status(400).json({ error: "Source code is required." });
         }
 
-        const runLocalCode = async (sourceCode, lang) => {
-            return new Promise(async (resolve) => {
-                const tempDir = os.tmpdir();
-                // simple random string for file name
-                const fileId = Math.random().toString(36).substring(7);
+        if (!process.env.JDOODLE_CLIENT_ID || !process.env.JDOODLE_CLIENT_SECRET) {
+            return res.status(500).json({ error: "JDoodle API keys missing from environment." });
+        }
 
-                let ext = lang.toLowerCase() === "python" ? "py" : "js";
-                // for mac/linux, python3 is common, fallback to python if python3 fails 
-                // but node runs 'node'
-                let cmd = lang.toLowerCase() === "python" ? "python3" : "node";
-
-                const filePath = path.join(tempDir, `code-${fileId}.${ext}`);
-
-                try {
-                    await fs.writeFile(filePath, sourceCode);
-
-                    const startTime = Date.now();
-                    // 5-second timeout
-                    exec(`${cmd} "${filePath}"`, { timeout: 5000 }, async (error, stdout, stderr) => {
-                        const endTime = Date.now();
-                        // clean up
-                        await fs.unlink(filePath).catch(() => { });
-
-                        let runStatus = "Accepted";
-                        let compileOutput = "";
-
-                        if (error) {
-                            if (error.killed) {
-                                runStatus = "Time Limit Exceeded";
-                                compileOutput = "Execution Timed Out (> 5s)";
-                            } else {
-                                runStatus = "Runtime Error";
-                            }
-                        }
-
-                        resolve({
-                            stdout: stdout || "",
-                            stderr: stderr || "",
-                            compile_output: compileOutput,
-                            time: ((endTime - startTime) / 1000).toFixed(3),
-                            memory: "N/A",
-                            status: runStatus
-                        });
-                    });
-                } catch (e) {
-                    resolve({
-                        stdout: "",
-                        stderr: e.message,
-                        compile_output: "",
-                        time: "0",
-                        memory: "N/A",
-                        status: "Internal Error"
-                    });
-                }
-            });
+        const JDOODLE_LANG_MAP = {
+            javascript: { language: 'nodejs', versionIndex: '4' }, // Node.js 17.x
+            python: { language: 'python3', versionIndex: '4' },    // Python 3.9.x
+            cpp: { language: 'cpp17', versionIndex: '1' },         // C++ 17
+            java: { language: 'java', versionIndex: '4' }          // Java 17
         };
 
-        const result = await runLocalCode(code, language);
+        const mappedConfig = JDOODLE_LANG_MAP[language.toLowerCase()];
 
-        // Return standardized response matching frontend expectations
+        if (!mappedConfig) {
+            return res.status(400).json({ error: `Language '${language}' is not supported.` });
+        }
+
+        const response = await axios.post('https://api.jdoodle.com/v1/execute', {
+            clientId: process.env.JDOODLE_CLIENT_ID,
+            clientSecret: process.env.JDOODLE_CLIENT_SECRET,
+            script: code,
+            language: mappedConfig.language,
+            versionIndex: mappedConfig.versionIndex
+        });
+
+        // A statusCode of 200 means the API call succeeded, even if the student's code has a syntax error
         return res.status(200).json({
-            stdout: result.stdout,
-            stderr: result.stderr,
-            compile_output: result.compile_output,
-            time: result.time,
-            memory: result.memory,
-            status: result.status
+            success: true,
+            output: response.data.output,
+            memory: response.data.memory,
+            time: response.data.cpuTime
         });
 
     } catch (error) {
-        console.error("❌ Local Execution Error:", error);
+        if (error.response && error.response.status === 429) {
+            return res.status(429).json({
+                success: false,
+                error: "Execution Rate Limit Exceeded. Please try again later."
+            });
+        }
+
+        console.error("❌ JDoodle Execution Error:", error.response?.data || error.message);
         return res.status(500).json({
-            error: "Failed to execute code locally.",
+            success: false,
+            error: "Execution service is currently unavailable.",
             details: error.message
         });
     }

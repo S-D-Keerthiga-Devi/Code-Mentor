@@ -7,3 +7,5 @@ frontend/node_modules/
 
 backend/uploads/
 *.pdf
+
+progress.md

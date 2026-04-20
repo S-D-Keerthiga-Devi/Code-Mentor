@@ -61,13 +61,30 @@ export const optimizeNodeCodeAPI = async (fullCode, lineNumber, language = "java
   }
 };
 
-// ✅ Execute code via Judge0
-export const executeJudge0 = async (code, language = "javascript") => {
+// ✅ Execute code via JDoodle
+export const executeCode = async (code, language = "javascript") => {
   try {
-    const response = await API.post("/api/ai/execute-judge0", { code, language });
+    const response = await API.post("/api/ai/execute-code", { code, language });
     return response.data;
   } catch (error) {
-    console.error("Error executing via Judge0:", error);
+    console.error("Error executing via JDoodle:", error);
+    throw error;
+  }
+};
+
+// ✅ Trigger n8n Course Generation
+export const generateCourseAPI = async (studentName, email, code, jdoodleError, experienceLevel = "beginner") => {
+  try {
+    const response = await API.post("/api/ai/generate-course", {
+      studentName,
+      email,
+      code,
+      jdoodleError,
+      experienceLevel
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error triggering course generation:", error);
     throw error;
   }
 };

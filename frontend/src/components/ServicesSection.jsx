@@ -28,6 +28,8 @@ const ServicesSection = () => {
       navigate("/auth-callback");
     } else if (serviceId === 3) {
       navigate("/visual-debugger");
+    } else if (serviceId === 4) {
+      navigate("/safe-suggest");
     } else if (serviceId === 7) {
       // Generate a random room ID for collaboration
       const roomId = Math.random().toString(36).substring(2, 7);
@@ -73,7 +75,7 @@ const ServicesSection = () => {
       title: "Personalized Tutoring",
       description: "Adaptive learning that adjusts to your needs - from guiding questions to complete solutions.",
       icon: GraduationCap,
-      status: "coming-soon",
+      status: "active",
       color: "pink"
     },
     {

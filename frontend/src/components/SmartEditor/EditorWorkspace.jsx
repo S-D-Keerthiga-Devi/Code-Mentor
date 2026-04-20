@@ -7,6 +7,7 @@ import { VscPlay, VscBeaker, VscFiles, VscClose } from 'react-icons/vsc';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { setVisualizerCode, setVisualizerLanguage } from '../../store/ideSlice';
+import { VscCommentDiscussion, VscWand, VscLightbulb } from 'react-icons/vsc';
 
 const EditorWorkspace = () => {
     const {
@@ -33,6 +34,14 @@ const EditorWorkspace = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [decorations, setDecorations] = useState([]);
 
+    // Quick Action Menu State
+    const [quickMenu, setQuickMenu] = useState({
+        visible: false,
+        top: 0,
+        smell: null,
+        snippet: ""
+    });
+
     const smellsRef = useRef([]);
 
     useEffect(() => {
@@ -43,6 +52,23 @@ const EditorWorkspace = () => {
     const handleEditorDidMount = (editor, monaco) => {
         setEditorInstance(editor);
         setMonacoInstance(monaco);
+
+        // Attach Cursor and Scroll Listeners
+        editor.onDidChangeCursorPosition((e) => {
+            handleCursorMove(e.position.lineNumber, editor);
+        });
+
+        editor.onDidScrollChange(() => {
+            setQuickMenu(prev => ({ ...prev, visible: false }));
+        });
+
+        editor.onMouseDown((e) => {
+            // Hide if clicked outside editor content margin (e.g., clicking on scrollbar)
+            if (e.target.type !== monaco.editor.MouseTargetType.CONTENT_TEXT &&
+                e.target.type !== monaco.editor.MouseTargetType.CONTENT_EMPTY) {
+                setQuickMenu(prev => ({ ...prev, visible: false }));
+            }
+        });
 
         if (!window._codeMentorProviders) {
             window._codeMentorProviders = true;
@@ -146,6 +172,26 @@ const EditorWorkspace = () => {
                     }
                 });
             });
+        }
+    };
+
+    const handleCursorMove = (line, editor) => {
+        const activeSmells = smellsRef.current;
+        const intersectingSmells = activeSmells.filter(s => s.line === line);
+
+        if (intersectingSmells.length > 0) {
+            const smell = intersectingSmells[0];
+            const topOffset = editor.getTopForLineNumber(line) - editor.getScrollTop();
+            const snippet = editor.getModel().getLineContent(line);
+
+            setQuickMenu({
+                visible: true,
+                top: topOffset,
+                smell: smell,
+                snippet: snippet
+            });
+        } else {
+            setQuickMenu(prev => ({ ...prev, visible: false }));
         }
     };
 
@@ -267,6 +313,24 @@ const EditorWorkspace = () => {
         );
     }
 
+    const handleQuickAction = async (actionType) => {
+        if (!quickMenu.smell) return;
+        const { smell, snippet } = quickMenu;
+
+        setQuickMenu(prev => ({ ...prev, visible: false })); // dismiss menu
+
+        if (actionType === 'explain') {
+            setIsChatOpen(true);
+            const prompt = `Can you explain the ${smell.type} issue in this selected code: \`${snippet.trim()}\``;
+            sendToChat(prompt, smell.socraticHint);
+        } else if (actionType === 'fix') {
+            toast.info("Auto-fixing code...", { autoClose: 2000 });
+            await executeAutoFix(smell.line, smell.type, editorInstance, monacoInstance, clearDecorations);
+        } else if (actionType === 'hint') {
+            toast.info(`💡 Hint: ${smell.socraticHint}`, { position: "top-center", autoClose: false });
+        }
+    };
+
     return (
         <div className="flex-1 flex flex-col h-full overflow-hidden bg-white font-sans">
             {/* Editor Tabs & Toolbar */}
@@ -297,31 +361,37 @@ const EditorWorkspace = () => {
                     <button
                         onClick={handleAnalyzeHeatmap}
                         disabled={isAnalyzing}
-                        className="flex items-center space-x-1.5 px-4 py-1.5 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-md transition shadow-sm disabled:opacity-50 font-medium tracking-wide"
+                        title="Analyze with Socratic hints"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-md transition shadow-sm disabled:opacity-50 font-medium tracking-wide"
                     >
                         <VscBeaker size={14} />
-                        <span>{isAnalyzing ? "Analyzing..." : "Analyze (Socratic)"}</span>
+                        <span>{isAnalyzing ? "Analyzing..." : "Analyze"}</span>
                     </button>
 
                     <button
                         onClick={handleRunCode}
-                        className="flex items-center space-x-1.5 px-4 py-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-md transition shadow-sm font-medium tracking-wide"
+                        title="Run Code execution"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-md transition shadow-sm font-medium tracking-wide"
                     >
                         <VscPlay size={14} />
-                        <span>Run Code</span>
+                        <span>Run</span>
                     </button>
 
                     <button
                         onClick={handleVisualDebugger}
-                        className="flex items-center space-x-1.5 px-4 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-md transition shadow-sm font-medium tracking-wide"
+                        title="Send to Visual Debugger"
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-md transition shadow-sm font-medium tracking-wide"
                     >
-                        <span>🎨 Send to Visual Debugger</span>
+                        <span>🎨</span>
+                        <span>Visualize</span>
                     </button>
 
                     <button
                         onClick={() => setIsChatOpen(!isChatOpen)}
-                        className={`flex items-center space-x-1.5 px-4 py-1.5 border border-gray-200 rounded-md transition shadow-sm font-medium tracking-wide ${isChatOpen ? 'bg-indigo-50 text-indigo-700' : 'bg-white hover:bg-gray-50 text-gray-700'}`}
+                        title="Toggle AI Chat"
+                        className={`flex items-center space-x-1.5 px-3 py-1.5 border border-gray-200 rounded-md transition shadow-sm font-medium tracking-wide ${isChatOpen ? 'bg-indigo-50 text-indigo-700' : 'bg-white hover:bg-gray-50 text-gray-700'}`}
                     >
+                        <VscCommentDiscussion size={14} />
                         <span>AI Chat</span>
                     </button>
                 </div>
@@ -353,6 +423,47 @@ const EditorWorkspace = () => {
                     }}
                     theme="light"
                 />
+
+                {/* Floating Quick Action Menu */}
+                {quickMenu.visible && quickMenu.smell && (
+                    <div
+                        className="absolute right-4 z-[100] group flex items-center shadow-lg rounded-md border border-gray-200 bg-white transition-all duration-200 ease-in-out"
+                        style={{ top: `${quickMenu.top + 18}px` }} // +18 rough offset for padding/header
+                    >
+                        {/* The Lightbulb Trigger */}
+                        <div className="p-1.5 cursor-pointer text-yellow-500 hover:bg-gray-50 rounded-l-md transition flex items-center justify-center border-r border-gray-100">
+                            <span className="text-lg">💡</span>
+                        </div>
+
+                        {/* Expanded Menu Options on Hover */}
+                        <div className="max-w-0 overflow-hidden group-hover:max-w-[250px] transition-all duration-300 ease-out flex opacity-0 group-hover:opacity-100 bg-white rounded-r-md">
+                            <button
+                                onClick={() => handleQuickAction('explain')}
+                                className="flex items-center space-x-1.5 px-3 py-1.5 text-[13px] font-medium text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 transition"
+                                title="Explain in Chat"
+                            >
+                                <VscCommentDiscussion size={14} />
+                                <span>Explain</span>
+                            </button>
+                            <button
+                                onClick={() => handleQuickAction('fix')}
+                                className="flex items-center space-x-1.5 px-3 py-1.5 text-[13px] font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition border-l border-gray-100"
+                                title="Auto-Fix (1 pt)"
+                            >
+                                <VscWand size={14} />
+                                <span>Fix</span>
+                            </button>
+                            <button
+                                onClick={() => handleQuickAction('hint')}
+                                className="flex items-center space-x-1.5 px-3 py-1.5 text-[13px] font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition border-l border-gray-100"
+                                title="Read Hint"
+                            >
+                                <VscLightbulb size={14} />
+                                <span>Hint</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
