@@ -10,6 +10,13 @@ const AuthCallback = () => {
 
     useEffect(() => {
         const checkRole = async () => {
+            // In production, some Clerk redirect settings can produce /auth-callback*
+            // Normalize that URL before continuing auth flow logic.
+            if (location.pathname.endsWith("*")) {
+                navigate("/auth-callback", { replace: true });
+                return;
+            }
+
             if (isLoaded && user) {
                 localStorage.removeItem("userRole"); // Clear stale role
 

@@ -46,7 +46,7 @@ const router = createBrowserRouter(
       <Route path='about' element={<About />} />
 
       {/* Auth Callback Route */}
-      <Route path='auth-callback' element={
+      <Route path='auth-callback*' element={
         <>
           <SignedIn><AuthCallback /></SignedIn>
           <SignedOut><RedirectToSignIn /></SignedOut>

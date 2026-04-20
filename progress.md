@@ -53,12 +53,19 @@
 - **Tech Stack**: React Flow (`@xyflow/react`), Dagre Layout, Monaco Editor, React, Tailwind CSS.
 - **Backend Architecture**: Express controllers, Gemini/Groq AI graph compiler (`generateVisualFlow`).
 - **Functionality**:
-  - A dynamic, interactive 4D execution map that renders the logical flow of user code.
-  - **Auto-Layout**: Utilizes `dagre` to automatically calculate x/y coordinates for nodes, preventing visual overlapping of complex graphs.
+  - A dynamic, interactive 2D/3D-style map of code execution using **React Flow**, visualizing logic flow as connected nodes (Complexity Nodes).
+  - **Auto-Layout (Dagre)**: Utilizes `dagre` to calculate hierarchical layouts and x/y coordinates for nodes, preventing overlapping. Supports Top-Bottom (default) or Left-Right layouts with hardcoded dimensions (`nodeWidth: 250`, `nodeHeight: 150`) for consistency.
+  - **Viewport Management (Large Algorithms)**:
+    - **Min/Max Zoom**: Configured to `0.05` for massive graphs and up to `2.0` for close-up inspections.
+    - **Auto-Fit**: Programmatically calls `fitView` post-generation and pre-simulation to ensure the entire graph is centered and visible.
   - **Intelligent Nodes**: Node colors (`indigo`, `orange`, `red`) and drop shadows scale dynamically based on the Big-O Time Complexity score determined by the AI server.
-  - **Interactive Integration**: Clicking any node on the Visual Flow chart automatically scrolls and highlights the corresponding line of code in the adjacent Monaco Editor.
+  - **Pulse Simulation**: Visualizes data flow by animating edges in sequence using a `setInterval` loop. The active step flashes indigo (`#4f46e5`) with a width of 3 to track progress.
+  - **Interactive Integration**: Clicking any node automatically scrolls and highlights the corresponding line of code in the adjacent Monaco Editor.
   - **Dual Display Modes**: Segmented local state allowing users to easily pivot between a 50/50 "Split View" (Code + Graph) and a pristine "Full Canvas" mode strictly for massive algorithm viewing.
-  - **Scroll Isolation**: Custom configuration ensuring both the React Flow canvas (`panOnScroll={false}`) and Monaco editor (`handleMouseWheel: false`) smoothly pass wheel events to the global window, guaranteeing users never get trapped midway down the webpage.
+  - **Scroll Isolation**: Custom configuration ensuring both the React Flow canvas (`panOnScroll={false}`) and Monaco editor (`handleMouseWheel: false`) smoothly pass wheel events to the global window.
+- **Integration with AI**:
+  - `generateVisualFlowAPI`: Calls the backend to generate nodes and edges from raw code.
+  - `optimizeNodeCodeAPI`: Allows users to optimize a specific logical block (node) directly from the canvas.
 
 ### 5. Course Material & Smart Study
 - **Tech Stack**: MongoDB, Multer, PDF-parse, Gemini AI.
@@ -66,6 +73,25 @@
   - **PDF Uploads**: Instructors can upload course materials (PDFs).
   - **Content Extraction**: The system extracts text from uploaded PDFs using `pdf-parse`.
   - **Context-Aware AI**: Students can ask questions, and the AI answers strictly based on the content of the uploaded course materials (Retrieved Augmented Generation - RAG).
+  - **n8n Study Guide Generation (AI + Webhook Automation)**:
+    - Generates a personalized remediation study guide when code execution fails and the learner needs targeted guidance.
+    - **End-to-End Process**:
+      1. Frontend calls `generateCourseAPI(...)` in `frontend/src/services/api.js`.
+      2. This sends `POST /api/ai/generate-course` with `studentName`, `email`, `code`, `jdoodleError`, and `experienceLevel`.
+      3. Route mapping in `backend/routes/aiRoutes.js` forwards the request to `triggerCourseGeneration` in `backend/controllers/aiController.js`.
+      4. `triggerCourseGeneration` uses Gemini (`gemini-2.5-flash`) with function calling (`provision_ephemeral_bootcamp`) to generate a structured blueprint:
+         - `identified_weakness`
+         - `google_doc_title`
+         - `Youtube_queries`
+         - `article_search_queries`
+         - `syllabus_outline`
+      5. Backend posts this blueprint to `process.env.N8N_WEBHOOK_URL` via Axios.
+      6. n8n receives the payload (`studentName`, `email`, `blueprint`) and continues the automation flow (e.g., generating and delivering the study guide document/resources).
+    - **Files Involved**:
+      - `frontend/src/services/api.js`
+      - `backend/routes/aiRoutes.js`
+      - `backend/controllers/aiController.js`
+      - `backend/controllers/bootCampController.js` (alternate/legacy variant of the same n8n bootcamp blueprint concept)
 
 ### 6. Code Execution Environment
 - **Tech Stack**: Node.js `child_process` (Local Execution), `xterm.js` (Frontend Terminal with `@xterm/addon-fit`).
@@ -149,6 +175,13 @@ To test the adaptive AI modes:
 3.  **Expected**: The graph perfectly scales inside the right-hand canvas. Nodes are automatically arranged via `dagre` top-to-bottom.
 4.  **Interaction**: Click any node on the graph. The corresponding line of code in the Monaco Editor will aggressively highlight in Indigo. Click the node again to dismiss the highlight.
 5.  **Layout**: Toggle between **Split View** (50/50 Code/Graph) and **Full Canvas** (100% Graph view). Scroll natively down to the website footer regardless of mouse hover state.
+
+### 6. n8n Study Guide Generation
+1.  Trigger the course flow from the frontend action that calls `generateCourseAPI(...)`.
+2.  Use input where `code` and `jdoodleError` are both populated (required by backend).
+3.  **Expected**: `POST /api/ai/generate-course` returns success with a generated `blueprint`.
+4.  **Expected**: Backend posts the payload to `N8N_WEBHOOK_URL` (check n8n webhook run history).
+5.  **Expected**: n8n workflow creates/sends the study guide artifacts based on `blueprint` fields and learner metadata.
 
 ## 📊 Feature Verification Status (Latest)
 

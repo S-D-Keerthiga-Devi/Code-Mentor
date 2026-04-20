@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -65,6 +65,15 @@ const FlowCanvasContent = ({ code, language, onNodeSelect, onOptimizationComplet
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSimulating, setIsSimulating] = useState(false);
 
+    useEffect(() => {
+        if (nodes.length > 0) {
+            const timer = setTimeout(() => {
+                fitView({ padding: 0.2, duration: 800, minZoom: 0.85, maxZoom: 1.2 });
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [nodes, fitView]);
+
     const handleOptimizeClick = useCallback(async (nodeData) => {
         try {
             const toastId = toast.loading("AI is optimizing this logic block...");
@@ -126,11 +135,6 @@ const FlowCanvasContent = ({ code, language, onNodeSelect, onOptimizationComplet
                 setNodes(layoutedNodes);
                 setEdges(layoutedEdges);
                 toast.success("Algorithmic Pulse generated!");
-
-                // Auto-center the newly generated graph perfectly on screen
-                setTimeout(() => {
-                    fitView({ padding: 0.2, duration: 800 });
-                }, 100);
             } else {
                 toast.error("Invalid AI response format.");
             }
@@ -172,6 +176,14 @@ const FlowCanvasContent = ({ code, language, onNodeSelect, onOptimizationComplet
                 }
                 return e;
             }));
+
+            const activeEdge = edges[currentIndex];
+            if (activeEdge) {
+                const activeNode = nodes.find(n => n.id === activeEdge.target);
+                if (activeNode && activeNode.position) {
+                    setCenter(activeNode.position.x, activeNode.position.y, { zoom: 1, duration: 600 });
+                }
+            }
 
             currentIndex++;
         }, 800);

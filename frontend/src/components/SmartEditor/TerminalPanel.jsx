@@ -2,16 +2,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { executeJudge0 } from '../../services/api';
+import { executeCode, generateCourseAPI } from '../../services/api';
 import { VscChevronDown, VscChevronUp, VscClose } from 'react-icons/vsc';
 import { useIDE } from '../../context/IDEContext';
+import { useUser } from '@clerk/clerk-react';
+import { toast } from 'react-toastify';
 
 const TerminalPanel = () => {
     const { isTerminalOpen, setIsTerminalOpen } = useIDE();
     const terminalRef = useRef(null);
     const xtermInstance = useRef(null);
     const [isRunning, setIsRunning] = useState(false);
-    const [lastExecutionStats, setLastExecutionStats] = useState(null);
+    const [isGeneratingCourse, setIsGeneratingCourse] = useState(false);
+    const [lastExecutionError, setLastExecutionError] = useState(null);
+    const [lastExecutedCode, setLastExecutedCode] = useState(null);
+    const [studyGuideData, setStudyGuideData] = useState(null);
+    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const { isLoaded, isSignedIn, user } = useUser();
 
     useEffect(() => {
         if (terminalRef.current && !xtermInstance.current) {
@@ -66,7 +73,9 @@ const TerminalPanel = () => {
         const handleRunExecution = async (event) => {
             const { code, language } = event.detail;
             setIsRunning(true);
-            setLastExecutionStats(null);
+            setLastExecutionError(null);
+            setLastExecutedCode(code);
+
 
             const term = xtermInstance.current?.term;
             if (term) {
@@ -75,28 +84,37 @@ const TerminalPanel = () => {
             }
 
             try {
-                const result = await executeJudge0(code, language);
+                const result = await executeCode(code, language);
 
                 if (term) {
                     term.clear();
-                    if (result.compile_output) {
-                        term.writeln(`\x1b[31mCompile Error:\x1b[0m\r\n${result.compile_output.replace(/\n/g, '\r\n')}`);
-                    } else if (result.stderr) {
-                        term.writeln(`\x1b[31mError:\x1b[0m\r\n${result.stderr.replace(/\n/g, '\r\n')}`);
+                    if (result.success) {
+                        const outputStr = result.output || "Success (No Output)";
+                        term.writeln(`\r\n${outputStr.replace(/\n/g, '\r\n')}`);
+                        
+                        // JDoodle returns success=true even if the script throws a runtime error.
+                        // We check the output for common error signatures to correctly toggle our UI.
+                        const errorKeywords = ['ReferenceError:', 'SyntaxError:', 'TypeError:', 'Error:', 'at node:internal', 'Exception in thread', 'Traceback (most recent call last):'];
+                        const isErrorOutput = errorKeywords.some(keyword => outputStr.includes(keyword));
+                        
+                        if (isErrorOutput) {
+                            setLastExecutionError(outputStr);
+                        }
+
+                        if (result.memory !== undefined) {
+                            term.writeln(`\r\n\x1b[36m⏱️ CPU Time: ${result.time || "0.00"}s | 💾 Memory: ${result.memory} KB\x1b[0m`);
+                        }
                     } else {
-                        term.writeln(`\r\n${(result.stdout || "Success (No Output)").replace(/\n/g, '\r\n')}`);
+                        const errorMsg = result.output || result.error || "Execution failed.";
+                        term.writeln(`\x1b[31mError:\x1b[0m\r\n${errorMsg.replace(/\n/g, '\r\n')}`);
+                        setLastExecutionError(errorMsg);
                     }
-                    // Save stats for the bottom bar instead of inside xterm
-                    setLastExecutionStats({
-                        time: result.time,
-                        memory: result.memory || 'N/A',
-                        status: result.status || 'Accepted'
-                    });
                 }
             } catch (err) {
                 if (term) {
                     term.clear();
-                    term.writeln('\x1b[31mTerminal Error: Failed to start execution process.\x1b[0m');
+                    term.writeln('\x1b[31mExecution service is currently unavailable.\x1b[0m');
+                    setLastExecutionError(err.message || 'Execution service unavailable');
                 }
             } finally {
                 setIsRunning(false);
@@ -106,6 +124,35 @@ const TerminalPanel = () => {
         window.addEventListener('runCodeExecution', handleRunExecution);
         return () => window.removeEventListener('runCodeExecution', handleRunExecution);
     }, []);
+
+    const handleGenerateCourse = async () => {
+        if (!lastExecutedCode || !lastExecutionError) return;
+        
+        if (!isLoaded || !isSignedIn) {
+            toast.error("You must be signed in to generate a study guide.");
+            return;
+        }
+        
+        setIsGeneratingCourse(true);
+        const studentName = user?.fullName || user?.firstName || "Anonymous Student";
+        const email = user?.primaryEmailAddress?.emailAddress;
+        
+        try {
+            const response = await generateCourseAPI(studentName, email, lastExecutedCode, lastExecutionError, "beginner");
+            if (response && response.blueprint) {
+                setStudyGuideData(response.blueprint);
+                setIsDrawerOpen(true);
+                toast.success("Study guide analyzed! Check the drawer.");
+            } else {
+                toast.success("Course generating in background! Check your Google Drive shortly.");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to trigger course generation. Please try again.");
+        } finally {
+            setIsGeneratingCourse(false);
+        }
+    };
 
     return (
         <div className="flex flex-col flex-shrink-0 font-sans border-t border-gray-200">
@@ -135,15 +182,75 @@ const TerminalPanel = () => {
                     <div ref={terminalRef} className="h-full w-full" />
                 </div>
 
+                {/* Generate Course Action */}
+                {lastExecutionError && !isRunning && (
+                    <div className="px-4 py-2 bg-red-50 border-t border-red-100 flex items-center justify-between">
+                        <span className="text-red-600 text-xs font-medium">Execution failed. Need help understanding this error?</span>
+                        <button
+                            onClick={handleGenerateCourse}
+                            disabled={isGeneratingCourse}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1.5 px-4 rounded shadow-sm transition-colors flex items-center disabled:opacity-50"
+                        >
+                            {isGeneratingCourse ? (
+                                <span className="animate-pulse">🤖 Analyzing code...</span>
+                            ) : (
+                                "📚 Generate Custom Study Guide"
+                            )}
+                        </button>
+                    </div>
+                )}
+
                 {/* Execution Stats Footer matching image exactly */}
                 <div className="px-4 py-1.5 border-t border-gray-100 bg-white text-gray-500 font-mono text-xs flex items-center">
-                    {lastExecutionStats ? (
+                    <span>Serverless Execution (Powered by JDoodle)</span>
+                </div>
+            </div>
+            {/* Slide-out Drawer for Study Guide */}
+            <div className={`fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out flex flex-col ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-white">
+                    <h2 className="text-lg font-bold text-gray-800">Your Custom Study Guide</h2>
+                    <button onClick={() => setIsDrawerOpen(false)} className="text-gray-400 hover:text-gray-700 transition-colors outline-none">
+                        <VscClose size={22} />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 bg-gray-50/50">
+                    {studyGuideData && (
                         <>
-                            Execution Time: {lastExecutionStats.time}s | Memory: {lastExecutionStats.memory}KB | Status : {lastExecutionStats.status}
+                            <div>
+                                <h3 className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-3">Identified Weakness</h3>
+                                <p className="text-gray-700 text-sm leading-relaxed bg-indigo-50/80 p-4 rounded-xl border border-indigo-100 shadow-sm">
+                                    {studyGuideData.identified_weakness}
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <h3 className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-3">Recommended Syllabus</h3>
+                                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                                    <ol className="list-decimal list-outside ml-4 text-sm text-gray-700 space-y-3">
+                                        {studyGuideData.syllabus_outline?.map((item, index) => (
+                                            <li key={index} className="pl-1 leading-relaxed">{item}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            </div>
                         </>
-                    ) : (
-                        <>Ready to execute.</>
                     )}
+                </div>
+
+                {/* Footer Action */}
+                <div className="p-4 border-t border-gray-100 bg-white">
+                    <button 
+                        onClick={() => window.open('https://docs.google.com/document/u/0/', '_blank', 'noopener,noreferrer')}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 text-sm"
+                    >
+                        📄 Open Google Docs to View Full Guide
+                    </button>
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                        Note: Your guide is being generated in the background. It will appear at the top of your recent documents and in your email inbox within a few seconds.
+                    </p>
                 </div>
             </div>
         </div>
