@@ -1,6 +1,6 @@
 // Navbar.jsx
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { toast } from "react-toastify";
 
@@ -25,15 +25,15 @@ export default function Navbar() {
 
       {/* Navigation Links */}
       <div className="hidden md:flex space-x-6">
-        <a href="/" className="text-gray-700 hover:text-indigo-600 transition-colors">
+        <Link to="/" className="text-gray-700 hover:text-indigo-600 transition-colors">
           Home
-        </a>
-        <a href="/about" className="text-gray-700 hover:text-indigo-600 transition-colors">
+        </Link>
+        <Link to="/about" className="text-gray-700 hover:text-indigo-600 transition-colors">
           About
-        </a>
-        <a href="/#features" className="text-gray-700 hover:text-indigo-600 transition-colors">
+        </Link>
+        <Link to="/#features" className="text-gray-700 hover:text-indigo-600 transition-colors">
           Features
-        </a>
+        </Link>
       </div>
 
       <div className="flex items-center space-x-4">
@@ -41,7 +41,12 @@ export default function Navbar() {
           <>
             <span className="text-gray-600 text-sm mr-2">Hello, {user.firstName}</span>
             <button
-              onClick={() => navigate("/auth-callback")}
+              onClick={() => {
+                const role = localStorage.getItem("userRole");
+                if (role === "student") navigate("/student/dashboard");
+                else if (role === "instructor") navigate("/instructor/dashboard");
+                else navigate("/auth-callback");
+              }}
               className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition"
             >
               Dashboard

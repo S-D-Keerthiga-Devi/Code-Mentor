@@ -36,12 +36,7 @@ if (!clerkPubKey) {
 const router = createBrowserRouter(
   createRoutesFromElements(
     <Route path='/' element={<Layout />}>
-      <Route path='' element={
-        <>
-          <SignedIn><Navigate to="/auth-callback" replace /></SignedIn>
-          <SignedOut><Home /></SignedOut>
-        </>
-      } />
+      <Route path='' element={<Home />} />
       <Route path='login/*' element={<Login />} />
       <Route path='sign-up/*' element={<SignUpPage />} />
       <Route path='email-verify' element={<EmailVerify />} />
