@@ -3,8 +3,7 @@ import mongoose from "mongoose";
 const suggestionLogSchema = new mongoose.Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String, // Changed to String to support Clerk IDs
       default: null,
     },
     language: {

@@ -4,6 +4,78 @@
 @tailwind utilities;
 
 
-*{
+* {
     font-family: "Outfit", sans-serif;
+}
+
+/* Print rules: hide global chrome, show only document */
+@media print {
+
+    nav,
+    header,
+    footer,
+    .site-header,
+    .site-footer,
+    .print\:hidden {
+        display: none !important;
+    }
+
+    .agreement-document {
+        margin: 0 !important;
+        padding: 0.75in !important;
+    }
+
+    body {
+        background: #fff !important;
+    }
+}
+
+/* Yjs Remote Cursors & Selections */
+.yRemoteSelection {
+    opacity: 0.5;
+}
+
+.yRemoteSelectionHead {
+    position: absolute;
+    border-left: orange solid 2px;
+    border-top: orange solid 2px;
+    border-bottom: orange solid 2px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.yRemoteSelectionHead::after {
+    position: absolute;
+    content: ' ';
+    border: 3px solid orange;
+    border-radius: 4px;
+    left: -4px;
+    top: -5px;
+}
+
+/* Socratic Heatmap Wavy Underlines */
+.smell-security {
+    text-decoration: underline wavy red;
+    background-color: rgba(255, 0, 0, 0.1);
+}
+
+.smell-performance {
+    text-decoration: underline wavy orange;
+    background-color: rgba(255, 165, 0, 0.1);
+}
+
+.smell-style {
+    text-decoration: underline wavy green;
+    background-color: rgba(0, 128, 0, 0.1);
+}
+
+/* Tailwind Typography Prose Overrides for strict word-breaking */
+.prose :not(pre)>code {
+    word-break: break-all !important;
+    white-space: pre-wrap !important;
+}
+
+/* Fix for React Flow Custom Node Tooltip overlap */
+.react-flow__node:hover {
+    z-index: 1000 !important;
 }

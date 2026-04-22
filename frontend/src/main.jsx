@@ -1,19 +1,37 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.jsx'
-import { RouterProvider, createBrowserRouter, createRoutesFromElements} from 'react-router-dom'
-import { Route } from 'react-router-dom'
+import { RouterProvider, createBrowserRouter, createRoutesFromElements, Route, Navigate } from 'react-router-dom'
+import { ClerkProvider, SignedIn, SignedOut, RedirectToSignIn } from "@clerk/clerk-react"
+import { Provider } from 'react-redux'
+import { ToastContainer } from 'react-toastify'
+import "react-toastify/dist/ReactToastify.css"
+
+import store from './store/store'
+import Layout from './Layout'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import SignUpPage from './pages/SignUp'
+import AuthCallback from './pages/AuthCallback'
 import EmailVerify from './pages/EmailVerify'
 import ResetPassword from './pages/ResetPassword'
-import Layout from './Layout'
-import store from './store/store'
-import { Provider } from 'react-redux'
-import { ToastContainer, toast } from 'react-toastify'
 import Dashboard from './pages/Dashboard'
 import SafeSuggest from './pages/SafeSuggest'
+import RoleSelection from './pages/RoleSelection'
+import StudentDashboard from './pages/student/StudentDashboard'
+import InstructorDashboard from './pages/instructor/InstructorDashboard'
+import InstructorMaterials from './pages/instructor/InstructorMaterials'
+import StudentCourseBot from './pages/student/StudentCourseBot'
+import About from './pages/About'
+import CollaborationRoom from './components/Collaboration/CollaborationRoom';
+import VisualDebuggerLayout from './components/VisualDebugger/VisualDebuggerLayout';
+
+// Import your Clerk Publishable Key
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!clerkPubKey) {
+  console.error("Missing Clerk Publishable Key");
+}
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -95,9 +113,13 @@ const router = createBrowserRouter(
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Provider store={store}>
-      <ToastContainer />
-      <RouterProvider router={router}/>
-    </Provider>
+
+
+    <ClerkProvider publishableKey={clerkPubKey}>
+      <Provider store={store}>
+        <ToastContainer theme="dark" />
+        <RouterProvider router={router} />
+      </Provider>
+    </ClerkProvider>
   </StrictMode>,
 )

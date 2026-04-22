@@ -1,29 +1,27 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useUser } from '@clerk/clerk-react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import CodeSection from '../components/CodeSection';
+import CodeSection from "../components/CodeAssistant/CodeSection";
 
 const SafeSuggest = () => {
   const navigate = useNavigate();
-  const { status } = useSelector((state) => state.auth);
+  const { isSignedIn, isLoaded } = useUser();
 
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem("token");
-    if (!status && !token) {
-      navigate('/login', { 
-        state: { 
+    if (isLoaded && !isSignedIn) {
+      sessionStorage.setItem('redirectAfterLogin', '/safe-suggest');
+      navigate('/login', {
+        state: {
           message: 'Please login to access the Smart Code Assistant',
           redirectTo: '/safe-suggest'
         }
       });
     }
-  }, [status, navigate]);
+  }, [isLoaded, isSignedIn, navigate]);
 
-  // Show loading or redirect if not authenticated
-  if (!status) {
+  if (!isLoaded || !isSignedIn) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
