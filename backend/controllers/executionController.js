@@ -33,11 +33,16 @@ export const executeCode = async (req, res) => {
             versionIndex: mappedConfig.versionIndex
         });
 
-        // A statusCode of 200 means the API call succeeded, even if the student's code has a syntax error
+        // JDoodle sets memory to null (or string "null") for ALL failures: timeouts, crashes, runtime errors.
+        // We expose a clean `isError` flag so the frontend never has to guess.
+        const rawMemory = response.data.memory;
+        const isError = rawMemory === null || rawMemory === undefined || rawMemory === 'null' || rawMemory === '';
+
         return res.status(200).json({
             success: true,
+            isError,
             output: response.data.output,
-            memory: response.data.memory,
+            memory: isError ? null : rawMemory,
             time: response.data.cpuTime
         });
 

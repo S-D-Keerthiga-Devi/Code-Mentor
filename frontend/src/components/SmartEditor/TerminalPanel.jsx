@@ -92,18 +92,14 @@ const TerminalPanel = () => {
                         const outputStr = result.output || "Success (No Output)";
                         term.writeln(`\r\n${outputStr.replace(/\n/g, '\r\n')}`);
                         
-                        // JDoodle returns success=true even if the script throws a runtime error.
-                        // We check the output for common error signatures to correctly toggle our UI.
-                        const errorKeywords = ['ReferenceError:', 'SyntaxError:', 'TypeError:', 'Error:', 'at node:internal', 'Exception in thread', 'Traceback (most recent call last):'];
-                        const isErrorOutput = errorKeywords.some(keyword => outputStr.includes(keyword));
-                        
-                        if (isErrorOutput) {
+                        // The backend sends a clean `isError` flag for ALL JDoodle failures
+                        // (timeout, crash, runtime error). We trust this instead of guessing.
+                        if (result.isError) {
                             setLastExecutionError(outputStr);
                         }
 
-                        if (result.memory !== undefined) {
-                            term.writeln(`\r\n\x1b[36m⏱️ CPU Time: ${result.time || "0.00"}s | 💾 Memory: ${result.memory} KB\x1b[0m`);
-                        }
+                        const memoryDisplay = result.memory !== null ? `${result.memory} KB` : 'N/A';
+                        term.writeln(`\r\n\x1b[36m⏱️ CPU Time: ${result.time || "0.00"}s | 💾 Memory: ${memoryDisplay}\x1b[0m`);
                     } else {
                         const errorMsg = result.output || result.error || "Execution failed.";
                         term.writeln(`\x1b[31mError:\x1b[0m\r\n${errorMsg.replace(/\n/g, '\r\n')}`);
