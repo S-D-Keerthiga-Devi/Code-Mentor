@@ -1,211 +1,234 @@
-import { executeCodeTool } from "../utils/executeCodeTool.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Groq from "groq-sdk";
 import dotenv from "dotenv";
 dotenv.config();
 
-// Reusing the robust fallback mechanism from agenticAnalysisController
-// We define a specialized executeSubAgent for the Graph Compiler
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility: extract the first valid JSON object from any AI response string.
+// Handles: raw JSON, ```json ... ```, ``` ... ```, or JSON embedded in text.
+// ─────────────────────────────────────────────────────────────────────────────
+function extractJSON(text) {
+    if (!text) return null;
 
+    // 1. Strip any markdown fences (```json ... ``` or ``` ... ```)
+    const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenceMatch) {
+        text = fenceMatch[1].trim();
+    }
+
+    // 2. Try parsing the whole thing first
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        // not clean JSON, continue
+    }
+
+    // 3. Find the first { and last } and try to parse that slice
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const slice = text.slice(firstBrace, lastBrace + 1);
+        try {
+            return JSON.parse(slice);
+        } catch (_) {
+            // still not valid
+        }
+    }
+
+    return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gemini runner — tries each model, falls back gracefully
+// ─────────────────────────────────────────────────────────────────────────────
 const runGeminiAnalysis = async (prompt) => {
     if (!process.env.GEMINI_API_KEY) {
-        throw new Error("GEMINI_API_KEY is missing");
+        throw new Error("GEMINI_API_KEY is not set in environment");
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro-latest"];
-
-    let responseText = "";
-    let success = false;
+    const models = ["gemini-2.0-flash", "gemini-1.5-flash"];
     let lastError = null;
 
     for (const modelName of models) {
         try {
-            console.log(`🤖 Starting Graph Compiler with model: ${modelName}`);
-            const model = genAI.getGenerativeModel({
-                model: modelName,
-            });
+            console.log(`🤖 [Gemini] Trying model: ${modelName}`);
+            const model = genAI.getGenerativeModel({ model: modelName });
             const chat = model.startChat();
             const response = await chat.sendMessage(prompt);
-            responseText = response.response.text().trim();
-            success = true;
-            break;
+            const text = response.response.text().trim();
+            console.log(`✅ [Gemini] Got response from ${modelName} (${text.length} chars)`);
+            return text;
         } catch (error) {
             lastError = error;
-            console.error(`❌ Graph Compiler Error with ${modelName}:`, error.message || error);
-            if (error.status === 429 || error.message?.includes("429") || error.message?.includes("500") || error.status === 500) {
-                throw error; // Bubble up to controller for fallback
-            }
+            console.error(`❌ [Gemini] ${modelName} failed: ${error.message}`);
+            // Continue to next model regardless of error type
         }
     }
 
-    if (!success) {
-        throw lastError || new Error("All Gemini models failed graph compiler.");
-    }
-
-    return responseText;
+    throw lastError || new Error("All Gemini models failed.");
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Groq runner — fallback provider
+// ─────────────────────────────────────────────────────────────────────────────
 const runGroqAnalysis = async (prompt) => {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) throw new Error("GROQ_API_KEY is missing");
+    if (!process.env.GROQ_API_KEY) {
+        throw new Error("GROQ_API_KEY is not set in environment");
+    }
 
-    const groq = new Groq({ apiKey });
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
     const modelName = "llama-3.3-70b-versatile";
 
-    try {
-        console.log(`🧠 Starting Groq Graph Compiler with model: ${modelName}`);
-        const response = await groq.chat.completions.create({
-            model: modelName,
-            messages: [{ role: "user", content: prompt }]
-        });
+    console.log(`🧠 [Groq] Trying model: ${modelName}`);
+    const response = await groq.chat.completions.create({
+        model: modelName,
+        messages: [{ role: "user", content: prompt }]
+    });
 
-        const responseText = response.choices[0].message.content?.trim() || "";
-        if (!responseText) {
-            throw new Error("Groq failed to generate visual flow.");
-        }
-        return responseText;
-    } catch (error) {
-        console.error(`❌ Graph Compiler Error with Groq:`, error.message || error);
-        throw error;
-    }
+    const text = response.choices[0]?.message?.content?.trim() || "";
+    if (!text) throw new Error("Groq returned empty response.");
+
+    console.log(`✅ [Groq] Got response (${text.length} chars)`);
+    return text;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Core agent: run Gemini → Groq → return raw text
+// ─────────────────────────────────────────────────────────────────────────────
 async function executeGraphCompilerAgent(code, language) {
-    const prompt = `You are a Graph Compiler. Analyze the provided code and generate a React Flow architecture map. Output ONLY valid JSON containing 'nodes' and 'edges'. Every node MUST have: { id, data: { label, type, complexityScore, lineNumber, mockMemoryState, shape }, position: {x, y} }. 
-- 'complexityScore' is 1-10 (O(1) = 1, O(N) = 5, O(N^2) = 10, etc).
-- 'mockMemoryState' is an object simulating what local variables would look like at this step (e.g., { "i": 0, "users": "[1, 2]" }). Keep values very short. If none, return {}.
-- 'shape' MUST be determined based on traditional flowcharts: use 'pill' for Start/Return/End nodes, 'diamond' for conditional statements (if, switch) and loops (for, while), and 'rectangle' for standard processes, variable declarations, and database queries.
-Edges must connect the logical flow. Do NOT wrap in markdown.
+    const prompt = `You are a Graph Compiler. Analyze the provided code and generate a React Flow architecture map.
+Output ONLY a raw JSON object (no markdown, no explanation) containing 'nodes' and 'edges'.
+
+Every node MUST have exactly this shape:
+{
+  "id": "string",
+  "data": {
+    "label": "string",
+    "type": "string",
+    "complexityScore": number (1-10),
+    "lineNumber": number,
+    "mockMemoryState": { /* key-value pairs, keep short */ },
+    "shape": "pill" | "diamond" | "rectangle"
+  },
+  "position": { "x": number, "y": number }
+}
+
+Shape rules:
+- "pill" → Start / Return / End nodes
+- "diamond" → if, switch, for, while (conditions/loops)
+- "rectangle" → variable declarations, function calls, processes
+
+complexityScore: O(1)=1, O(logN)=3, O(N)=5, O(N^2)=10
+
+Edges must connect the logical flow. Output ONLY the raw JSON object.
 
 Analyze this ${language || "code"}:
 \`\`\`${language || ""}
 ${code}
-\`\`\`
-`;
+\`\`\``;
 
     let responseText = "";
 
+    // Try Gemini first
     try {
-        console.log(`🤖 [GraphCompiler] Attempting analysis with Gemini...`);
         responseText = await runGeminiAnalysis(prompt);
     } catch (geminiError) {
-        console.warn(`⚠️ [GraphCompiler] Gemini Failed (${geminiError.message}). Falling back to Groq...`);
+        console.warn(`⚠️ [GraphCompiler] Gemini failed: ${geminiError.message}. Trying Groq...`);
         try {
-            console.log(`🧠 [GraphCompiler] Attempting analysis with Groq (Llama-3)...`);
             responseText = await runGroqAnalysis(prompt);
         } catch (groqError) {
-            console.error(`❌ [GraphCompiler] Both Gemini and Groq failed.`);
-            return null;
+            console.error(`❌ [GraphCompiler] Both providers failed. Gemini: ${geminiError.message} | Groq: ${groqError.message}`);
+            throw new Error(`AI providers unavailable. Gemini: ${geminiError.message} | Groq: ${groqError.message}`);
         }
     }
 
-    let rawText = responseText.trim();
-    if (rawText.startsWith("```")) {
-        const lines = rawText.split('\n');
-        if (lines.length > 2) {
-            rawText = lines.slice(1, -1).join('\n').trim();
-        } else {
-            rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
-        }
-    }
-
-    return rawText;
+    return responseText;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Route handler: POST /api/ai/visualize-flow
+// ─────────────────────────────────────────────────────────────────────────────
 export const generateVisualFlow = async (req, res) => {
     const { code, language } = req.body;
 
+    if (!code || !code.trim()) {
+        return res.status(400).json({ error: "No code provided for visualizer." });
+    }
+
     try {
-        if (!code || !code.trim()) {
-            return res.status(400).json({ error: "No code provided for visualizer." });
+        const rawText = await executeGraphCompilerAgent(code, language);
+
+        // Bulletproof JSON extraction
+        const parsedData = extractJSON(rawText);
+
+        if (!parsedData || !parsedData.nodes || !parsedData.edges) {
+            console.error("❌ [VisualFlow] Could not extract valid nodes/edges from response:");
+            console.error("Raw response snippet:", rawText.slice(0, 500));
+            return res.status(500).json({
+                error: "AI returned an invalid graph structure.",
+                hint: "The AI response could not be parsed into nodes and edges."
+            });
         }
 
-        const rawJsonText = await executeGraphCompilerAgent(code, language);
-
-        if (!rawJsonText) {
-            return res.status(500).json({ error: "Failed to generate visual flow." });
-        }
-
-        try {
-            const parsedData = JSON.parse(rawJsonText);
-            return res.status(200).json(parsedData);
-        } catch (parseError) {
-            console.error("❌ Failed to parse Graph Compiler response as JSON:", rawJsonText);
-            return res.status(500).json({ error: "AI returned invalid JSON." });
-        }
+        console.log(`✅ [VisualFlow] Generated graph: ${parsedData.nodes.length} nodes, ${parsedData.edges.length} edges`);
+        return res.status(200).json(parsedData);
 
     } catch (error) {
-        console.error("❌ Visual Debugger Error:", error);
+        console.error("❌ [VisualFlow] Controller error:", error.message);
         return res.status(500).json({
-            error: "Failed to generate visual flow",
+            error: "Failed to generate visual flow.",
             details: error.message
         });
     }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Route handler: POST /api/ai/optimize-node
+// ─────────────────────────────────────────────────────────────────────────────
 export const optimizeNodeCode = async (req, res) => {
     const { fullCode, lineNumber, language } = req.body;
 
-    try {
-        if (!fullCode || !lineNumber) {
-            return res.status(400).json({ error: "Missing required fields for optimization." });
-        }
+    if (!fullCode || !lineNumber) {
+        return res.status(400).json({ error: "Missing required fields: fullCode and lineNumber." });
+    }
 
-        const prompt = `You are an Expert Software Architect. The user wants to optimize a specific inefficient node in their code.
-Code context (${language || 'javascript'}):
+    const prompt = `You are an Expert Software Architect. The user wants to optimize a specific inefficient node.
+
+Code context (${language || "javascript"}):
 \`\`\`
 ${fullCode}
 \`\`\`
 
-Focus strictly on the logic around line number ${lineNumber}.
-Your job is to rewrite the inefficient block starting at that line to an O(1) or O(log N) or O(N) optimized version. 
-Output ONLY valid JSON in this exact format, with no markdown wrappers:
+Focus on the logic around line ${lineNumber}. Rewrite that inefficient block to a better time complexity.
+Output ONLY a raw JSON object (no markdown) in this exact format:
 {
-  "optimizedCode": "// the completely rewritten full block of code as a string (use \\n for newlines)",
-  "targetLineStart": (integer, the first line number you are replacing),
-  "targetLineEnd": (integer, the last line number you are replacing)
-}
-Keep the optimization focused only on resolving the complexity spike at that node.`;
+  "optimizedCode": "// rewritten code block as a string",
+  "targetLineStart": <integer>,
+  "targetLineEnd": <integer>
+}`;
 
-        let rawJsonText = "";
+    let rawText = "";
 
+    try {
+        rawText = await runGeminiAnalysis(prompt);
+    } catch (geminiError) {
+        console.warn(`⚠️ [Optimizer] Gemini failed: ${geminiError.message}. Trying Groq...`);
         try {
-            console.log(`🤖 [Optimizer] Attempting with Gemini...`);
-            rawJsonText = await runGeminiAnalysis(prompt);
-        } catch (geminiError) {
-            console.warn(`⚠️ [Optimizer] Gemini Failed. Falling back to Groq...`);
-            try {
-                rawJsonText = await runGroqAnalysis(prompt);
-            } catch (groqError) {
-                console.error(`❌ [Optimizer] Both Gemini and Groq failed.`);
-                return res.status(500).json({ error: "AI failed to optimize code." });
-            }
+            rawText = await runGroqAnalysis(prompt);
+        } catch (groqError) {
+            console.error(`❌ [Optimizer] Both providers failed.`);
+            return res.status(500).json({ error: "AI providers unavailable for optimization." });
         }
-
-        let cleanText = rawJsonText.trim();
-        if (cleanText.startsWith("```")) {
-            const lines = cleanText.split('\n');
-            if (lines.length > 2) {
-                cleanText = lines.slice(1, -1).join('\n').trim();
-            } else {
-                cleanText = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
-            }
-        }
-
-        try {
-            const parsedData = JSON.parse(cleanText);
-            return res.status(200).json(parsedData);
-        } catch (parseError) {
-            console.error("❌ Failed to parse Optimizer response:", cleanText);
-            return res.status(500).json({ error: "AI returned invalid JSON." });
-        }
-
-    } catch (error) {
-        console.error("❌ Node Optimizer Error:", error);
-        return res.status(500).json({
-            error: "Failed to optimize node",
-            details: error.message
-        });
     }
+
+    const parsedData = extractJSON(rawText);
+
+    if (!parsedData || !parsedData.optimizedCode) {
+        console.error("❌ [Optimizer] Could not extract valid JSON:", rawText.slice(0, 300));
+        return res.status(500).json({ error: "AI returned invalid optimization response." });
+    }
+
+    console.log(`✅ [Optimizer] Optimization complete for line ${lineNumber}`);
+    return res.status(200).json(parsedData);
 };
