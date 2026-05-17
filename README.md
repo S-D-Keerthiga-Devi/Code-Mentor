@@ -21,32 +21,20 @@
 
 ### 🧠 Smart IDE (`/safe-suggest`)
 
-* **Serverless Execution:** Run JavaScript and Python natively in the browser via the **JDoodle API** with an integrated `xterm.js` terminal.
-* **Universal Error Detection:** The backend inspects JDoodle's `memory: null` signal to reliably catch every failure type — runtime errors, syntax errors, infinite loops, and timeouts — and surfaces a contextual error prompt in the terminal.
-* **Socratic Heatmap:** Multi-agent AI scans code and overlays color-coded hints directly in the Monaco editor:
-  * 🔴 **Security** — Detects vulnerabilities (SQLi, XSS, exposed secrets).
-  * 🟡 **Performance** — Highlights Big-O inefficiencies and memory leaks.
-  * 🟢 **Style** — Enforces clean code principles (DRY, naming conventions).
-* **Adaptive Tutoring:** AI scales from direct hints to pure Socratic questioning based on the student's dependency level (Green / Yellow / Red).
-* **Visual Debugger:** Sends algorithms to a **React Flow** canvas for dynamic, animated flow visualization.
-* **AI Chat Panel:** Persistent in-editor assistant for Socratic tutoring and code explanations.
+* **Serverless Execution:** Run JavaScript and Python in the browser via the **JDoodle API** with an integrated `xterm.js` terminal. All failure types (runtime errors, timeouts, infinite loops) are detected using JDoodle's `memory: null` signal.
+* **Socratic Heatmap:** Three concurrent AI agents scan code and overlay colour-coded hints in Monaco — 🔴 Security (SQLi, XSS), 🟡 Performance (Big-O, memory leaks), 🟢 Style (DRY, naming). Hint depth adapts across Green / Yellow / Red pedagogy modes.
+* **AI Chat Panel:** Persistent in-editor assistant for Socratic tutoring, code explanations, and auto-fix suggestions.
 
 ### 📚 AI-Powered Study Guide (n8n Workflow)
 
-When code execution fails, Code Mentor automatically generates a **personalised study guide** for the student:
+When execution fails, a *"Generate Custom Study Guide"* button appears in the terminal. Clicking it:
 
-1. **Error Detected** — The terminal identifies that JDoodle returned a failure (any error type: `ReferenceError`, `TypeError`, timeout, crash).
-2. **Gemini Analysis** — The `triggerCourseGeneration` endpoint calls **Gemini 2.5 Flash** with a structured `provision_ephemeral_bootcamp` tool to produce a course blueprint tailored to the student's experience level. The blueprint includes:
-   * Identified weakness (e.g., *"O(N²) Nested Loops"*)
-   * A motivating Google Doc title
-   * Specific YouTube search queries for video tutorials
-   * Article/documentation search queries (MDN, etc.)
-   * A 3-step learning syllabus
-3. **n8n Webhook** — The blueprint is immediately POSTed to an **n8n** webhook (`N8N_WEBHOOK_URL`). The n8n workflow then:
-   * Creates a **formatted Google Doc** with the study plan
-   * Sends a personalised **email** to the student with their guide
-   * Delivers the document to their **Google Drive**
-4. **Frontend CTA** — The terminal panel shows a *"Generate Custom Study Guide"* button on any failure, giving students instant access to their personalised course.
+1. Sends the error and code to **Gemini 2.5 Flash**, which uses a structured tool to build a course blueprint (identified weakness, YouTube queries, article links, 3-step syllabus).
+2. POSTs the blueprint to an **n8n webhook**, which automatically creates a **Google Doc**, sends it to the student's **Google Drive**, and delivers a personalised **email**.
+
+### 🎨 Visual Debugger
+
+* Sends code to a **React Flow** canvas where AI generates a hierarchical node graph of the algorithm's logic, with animated edge pulses to simulate execution flow step by step.
 
 ### 👥 Real-Time Collaboration
 
