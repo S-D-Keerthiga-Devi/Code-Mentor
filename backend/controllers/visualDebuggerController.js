@@ -102,9 +102,9 @@ ${code}
 
     let rawText = responseText.trim();
     if (rawText.startsWith("```")) {
-        const lines = rawText.split('\\n');
+        const lines = rawText.split('\n');
         if (lines.length > 2) {
-            rawText = lines.slice(1, -1).join('\\n').trim();
+            rawText = lines.slice(1, -1).join('\n').trim();
         } else {
             rawText = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
         }
@@ -184,12 +184,12 @@ Keep the optimization focused only on resolving the complexity spike at that nod
         }
 
         let cleanText = rawJsonText.trim();
-        if (cleanText.startsWith("\`\`\`")) {
-            const lines = cleanText.split('\\n');
+        if (cleanText.startsWith("```")) {
+            const lines = cleanText.split('\n');
             if (lines.length > 2) {
-                cleanText = lines.slice(1, -1).join('\\n').trim();
+                cleanText = lines.slice(1, -1).join('\n').trim();
             } else {
-                cleanText = cleanText.replace(/\`\`\`json/gi, '').replace(/\`\`\`/g, '').trim();
+                cleanText = cleanText.replace(/```json/gi, '').replace(/```/g, '').trim();
             }
         }
 
