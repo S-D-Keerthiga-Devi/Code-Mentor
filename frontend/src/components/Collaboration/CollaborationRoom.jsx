@@ -15,6 +15,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { IndexeddbPersistence } from "y-indexeddb";
+import { executeCode } from "../../services/api";
 
 const CollaborationRoom = () => {
     const { roomId } = useParams();
@@ -53,47 +54,111 @@ const CollaborationRoom = () => {
         }
     }, [activeTab, roomId]);
 
+// Dynamic Yjs WebSocket Server URL Resolver
+const getYjsServerUrl = () => {
+    // 1. Explicit environment variable for Yjs
+    const explicitUrl = import.meta.env.VITE_YJS_SERVER_URL;
+    if (explicitUrl && typeof explicitUrl === 'string' && explicitUrl.trim()) {
+        let url = explicitUrl.trim();
+        if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('ws://')) {
+            url = url.replace(/^ws:\/\//, 'wss://');
+        }
+        return url;
+    }
+
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    // 2. Local development on HTTP
+    if (isLocalhost && !isHttps) {
+        return `ws://${hostname}:1234`;
+    }
+
+    // 3. Convert backend URL if deployed over HTTPS
+    const backendUrl = import.meta.env.VITE_BACKEND_URL;
+    if (backendUrl && !backendUrl.includes('localhost')) {
+        try {
+            const parsed = new URL(backendUrl);
+            const wsProto = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${wsProto}//${parsed.host}`;
+        } catch (e) {
+            console.warn("Could not parse VITE_BACKEND_URL for Yjs server:", e);
+        }
+    }
+
+    // 4. Default for production over HTTPS (e.g. Vercel deployment):
+    // Use official secure public Yjs WebSocket server
+    return 'wss://demos.yjs.dev';
+};
+
     // Handle Monaco Editor Mount & Yjs Setup
     const handleEditorDidMount = useCallback((editor, monaco) => {
         editorRef.current = editor;
 
-        // Clean up previous instances if any (though useEffect handles unmount)
-        if (docRef.current) docRef.current.destroy();
-        if (providerRef.current) providerRef.current.destroy();
+        // Clean up previous instances if any
+        if (bindingRef.current) bindingRef.current.destroy();
+        if (providerRef.current) {
+            providerRef.current.disconnect();
+            providerRef.current.destroy();
+        }
         if (persistenceRef.current) persistenceRef.current.destroy();
+        if (docRef.current) docRef.current.destroy();
 
         // 1. Initialize Yjs Document
         const doc = new Y.Doc();
         docRef.current = doc;
 
-        // 2. Initialize WebSocket Provider (Local Server)
-        // Using local server for reliability
-        const provider = new WebsocketProvider(
-            `ws://${window.location.hostname}:1234`,
-            roomId,
-            doc
-        );
-        providerRef.current = provider;
+        // 2. Initialize WebSocket Provider with secure URL resolution
+        let provider = null;
+        try {
+            const wsServerUrl = getYjsServerUrl();
+            const yjsRoomName = `code-mentor-room-${roomId}`;
+            console.log(`Connecting Yjs WebSocket to ${wsServerUrl} for room ${yjsRoomName}`);
 
-        provider.on('status', event => {
-            console.log('WebSocket Status:', event.status);
-            if (event.status === 'connected') setYjsStatus('connected');
-            if (event.status === 'disconnected') setYjsStatus('disconnected');
-            if (event.status === 'connecting') setYjsStatus('connecting');
-        });
+            provider = new WebsocketProvider(
+                wsServerUrl,
+                yjsRoomName,
+                doc
+            );
+            providerRef.current = provider;
 
-        provider.on('connection-error', event => {
-            console.error('WebSocket Connection Error:', event);
+            provider.on('status', event => {
+                console.log('WebSocket Status:', event.status);
+                if (event.status === 'connected') setYjsStatus('connected');
+                if (event.status === 'disconnected') setYjsStatus('disconnected');
+                if (event.status === 'connecting') setYjsStatus('connecting');
+            });
+
+            provider.on('connection-error', event => {
+                console.warn('WebSocket Connection Error:', event);
+                setYjsStatus('error');
+            });
+
+            // 5. Set User Awareness (Cursor & Name)
+            const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+            if (provider.awareness) {
+                provider.awareness.setLocalStateField("user", {
+                    name: userName,
+                    color: randomColor,
+                });
+            }
+        } catch (wsError) {
+            console.error("Failed to initialize Yjs WebSocket provider:", wsError);
             setYjsStatus('error');
-        });
+        }
 
         // 3. Initialize IndexedDB Persistence (Offline Support)
-        const persistence = new IndexeddbPersistence(roomId, doc);
-        persistenceRef.current = persistence;
+        try {
+            const persistence = new IndexeddbPersistence(`code-mentor-${roomId}`, doc);
+            persistenceRef.current = persistence;
 
-        persistence.on('synced', () => {
-            console.log('Content loaded from local database');
-        });
+            persistence.on('synced', () => {
+                console.log('Content loaded from local database');
+            });
+        } catch (idbError) {
+            console.warn("IndexedDB persistence unavailable:", idbError);
+        }
 
         // 4. Connect Yjs to Monaco
         const type = doc.getText("monaco"); // Shared text type
@@ -102,21 +167,18 @@ const CollaborationRoom = () => {
             type,
             editor.getModel(),
             new Set([editor]),
-            provider.awareness
+            provider ? provider.awareness : null
         );
         bindingRef.current = binding;
-
-        // 5. Set User Awareness (Cursor & Name)
-        const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
-        provider.awareness.setLocalStateField("user", {
-            name: userName,
-            color: randomColor,
-        });
 
         // 6. Interaction Logging Helper
         const logInteraction = async (actionType, metadata = {}) => {
             try {
-                await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/ai/log`, {
+                const backendUrl = import.meta.env.VITE_BACKEND_URL;
+                if (!backendUrl || (window.location.protocol === 'https:' && backendUrl.includes('localhost'))) {
+                    return;
+                }
+                await fetch(`${backendUrl}/api/ai/log`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -167,13 +229,17 @@ const CollaborationRoom = () => {
         if (!editor) return;
 
         const code = editor.getValue();
-        if (!code.trim()) return;
+        if (!code.trim()) {
+            setOutput("Warning: Editor is empty. Write some code to execute.");
+            setShowTerminal(true);
+            return;
+        }
 
         setIsRunning(true);
         setShowTerminal(true); // Auto-open terminal
-        setOutput("Running...");
+        setOutput("Executing code...");
 
-        // Client-side Execution for JavaScript
+        // 1. Client-side Execution for JavaScript (Instant Output)
         if (language === "javascript") {
             try {
                 let capturedOutput = [];
@@ -186,59 +252,45 @@ const CollaborationRoom = () => {
                     },
                     warn: (...args) => {
                         capturedOutput.push("Warning: " + args.map(a => String(a)).join(" "));
+                    },
+                    info: (...args) => {
+                        capturedOutput.push("Info: " + args.map(a => String(a)).join(" "));
                     }
                 };
 
-                // Wrap execution in a Promise to handle potential async code (basic support)
-                // Note: This is a basic isolation. For production, consider Web Workers or dedicated sandboxes.
                 const runUserCode = new Function("console", code);
-
                 runUserCode(customConsole);
 
-                setOutput(capturedOutput.length > 0 ? capturedOutput.join("\n") : "Code executed successfully (No output).");
-
-            } catch (error) {
-                console.error("Local Execution Error:", error);
-                setOutput(`Runtime Error: ${error.message}`);
-            } finally {
-                setIsRunning(false);
+                if (capturedOutput.length > 0) {
+                    setOutput(capturedOutput.join("\n"));
+                    setIsRunning(false);
+                    return;
+                }
+            } catch (clientErr) {
+                console.warn("Client JS eval threw runtime error, querying backend execution engine...", clientErr);
             }
-            return;
         }
 
-        // Server-side Execution for other languages (Piston API)
-        // Note: Piston Public API is restricted. In a real scenario, use a private instance or a key-based service (Judge0).
-        let apiLanguage = language;
-        let apiVersion = "*";
-
-        if (language === "python") { apiLanguage = "python"; apiVersion = "3.10.0"; }
-        if (language === "cpp") { apiLanguage = "c++"; apiVersion = "10.2.0"; }
-
+        // 2. Official Backend Multi-Language Execution (JDoodle Engine)
         try {
-            const response = await fetch("https://emkc.org/api/v2/piston/execute", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    language: apiLanguage,
-                    version: apiVersion,
-                    files: [{ content: code }]
-                })
-            });
+            const result = await executeCode(code, language);
+            if (result && result.success) {
+                const outputStr = result.output || "Code executed successfully (No Output).";
+                const memoryDisplay = result.memory ? ` | Memory: ${result.memory} KB` : "";
+                const timeDisplay = result.time ? ` | CPU Time: ${result.time}s` : "";
 
-            if (response.status === 401 || response.status === 403) {
-                setOutput(`Error: The public code execution engine (Piston API) is currently unavailable (401 Unauthorized).\n\nPlease only run JavaScript code (which runs locally) or configure a self-hosted Piston instance or Judge0 API key.`);
-            } else {
-                const data = await response.json();
-                if (data.run) {
-                    setOutput(data.run.output);
+                if (result.isError) {
+                    setOutput(`Runtime Output:\n${outputStr}${memoryDisplay}${timeDisplay}`);
                 } else {
-                    setOutput(data.message || "Error: No output returned.");
+                    setOutput(`${outputStr}\n\n[Execution Finished${timeDisplay}${memoryDisplay}]`);
                 }
+            } else {
+                setOutput(`Execution Error:\n${result?.output || result?.error || "Unable to execute code snippet."}`);
             }
-
         } catch (error) {
             console.error("Execution Error:", error);
-            setOutput(`Error: ${error.message}`);
+            const errDetail = error.response?.data?.error || error.message;
+            setOutput(`Execution Error: ${errDetail}\n\nPlease ensure your backend server is active.`);
         } finally {
             setIsRunning(false);
         }
@@ -248,9 +300,9 @@ const CollaborationRoom = () => {
     const [aiMode, setAiMode] = useState("Standard");
 
     return (
-        <div className="flex flex-col h-screen bg-gray-100">
+        <div className="flex flex-col h-screen bg-slate-100 font-sans overflow-hidden">
             <Navbar />
-            <div className="flex flex-1 overflow-hidden pt-16 relative">
+            <div className="flex flex-1 overflow-hidden relative">
 
                 {/* Desktop Users List */}
                 <div className="hidden md:flex">
@@ -426,9 +478,9 @@ const CollaborationRoom = () => {
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div className="flex-1 p-4 font-mono text-sm overflow-auto">
+                                            <div className="flex-1 p-4 font-mono text-xs sm:text-sm overflow-auto">
                                                 {output ? (
-                                                    <pre className="text-green-400 whitespace-pre-wrap">{output}</pre>
+                                                    <pre className={`${output.toLowerCase().includes("error") ? "text-rose-400" : "text-emerald-400"} whitespace-pre-wrap leading-relaxed`}>{output}</pre>
                                                 ) : (
                                                     <div className="text-gray-500 italic">Click "Run Code" to see output...</div>
                                                 )}

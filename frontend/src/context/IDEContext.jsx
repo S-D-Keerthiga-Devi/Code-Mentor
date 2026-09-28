@@ -83,38 +83,42 @@ export const IDEProvider = ({ children }) => {
         try {
             const data = await autoFixCode(activeFile.content, activeFile.language, lineNumber, smellType, user?.id);
 
-            if (data && data.fixedLine) {
-                const currentLineText = editorInstance.getModel().getLineContent(lineNumber).trim();
-                const receivedFix = data.fixedLine.trim();
+            if (data && (data.fixedCode || data.fixedLine)) {
+                const receivedFix = (data.fixedLine || "").trim();
 
                 if (receivedFix === "NO_FIX_NEEDED") {
                     toast.update(toastId, { render: "ℹ️ AI determined no changes are needed for this specific line.", type: "info", isLoading: false, autoClose: 4000 });
                     return;
                 }
 
-                if (!receivedFix || receivedFix === currentLineText) {
-                    toast.update(toastId, { render: "⚠️ AI could not determine a valid fix. No changes made.", type: "warning", isLoading: false, autoClose: 3000 });
-                } else {
-                    toast.update(toastId, { render: "✅ Code Fixed! (-1 Point)", type: "success", isLoading: false, autoClose: 3000 });
+                toast.update(toastId, { render: `✅ Code Fixed! (-1 Point)${data.explanation ? ` — ${data.explanation}` : ''}`, type: "success", isLoading: false, autoClose: 3500 });
 
-                    // Unlock the editor so executeEdits doesn't fail silently
-                    editorInstance.updateOptions({ readOnly: false });
+                // Unlock the editor so executeEdits doesn't fail silently
+                editorInstance.updateOptions({ readOnly: false });
 
-                    // Surgically replace the line in the editor
+                if (data.fixedCode && data.fixedCode.trim().length > 0) {
+                    // Replace full model cleanly with optimal working code
+                    const fullRange = editorInstance.getModel().getFullModelRange();
+                    editorInstance.executeEdits("socratic-autofix", [{
+                        range: fullRange,
+                        text: data.fixedCode.trim(),
+                        forceMoveMarkers: true
+                    }]);
+                    updateFileContent(activeFileId, data.fixedCode.trim());
+                } else if (data.fixedLine) {
+                    // Single line replacement fallback
                     const range = new monacoInstance.Range(lineNumber, 1, lineNumber, editorInstance.getModel().getLineMaxColumn(lineNumber));
                     editorInstance.executeEdits("socratic-autofix", [{
                         range: range,
                         text: data.fixedLine,
                         forceMoveMarkers: true
                     }]);
-
-                    // Update the context state so it's fresh for the next analysis
                     updateFileContent(activeFileId, editorInstance.getValue());
-
-                    if (clearDecorationsCallback) clearDecorationsCallback();
                 }
+
+                if (clearDecorationsCallback) clearDecorationsCallback();
             } else {
-                toast.update(toastId, { render: "Failed to generate auto-fix. No line returned.", type: "error", isLoading: false, autoClose: 3000 });
+                toast.update(toastId, { render: "Failed to generate auto-fix. No code returned.", type: "error", isLoading: false, autoClose: 3000 });
             }
         } catch (err) {
             console.error("Auto-fix Error:", err);

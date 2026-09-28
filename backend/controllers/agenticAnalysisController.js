@@ -10,7 +10,7 @@ const runGeminiAnalysis = async (prompt) => {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro-latest"];
+    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.8-flash"];
 
     const agentTools = [{
         functionDeclarations: [{
@@ -98,7 +98,7 @@ const runGroqAnalysis = async (prompt) => {
     if (!apiKey) throw new Error("GROQ_API_KEY is missing");
 
     const groq = new Groq({ apiKey });
-    const modelName = "llama-3.3-70b-versatile";
+    const modelName = "openai/gpt-oss-120b";
 
     const agentTools = [{
         type: "function",

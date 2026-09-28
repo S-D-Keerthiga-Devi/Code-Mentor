@@ -37,9 +37,9 @@
 
 .yRemoteSelectionHead {
     position: absolute;
-    border-left: orange solid 2px;
-    border-top: orange solid 2px;
-    border-bottom: orange solid 2px;
+    border-left: #6366f1 solid 2px;
+    border-top: #6366f1 solid 2px;
+    border-bottom: #6366f1 solid 2px;
     height: 100%;
     box-sizing: border-box;
 }
@@ -47,7 +47,7 @@
 .yRemoteSelectionHead::after {
     position: absolute;
     content: ' ';
-    border: 3px solid orange;
+    border: 3px solid #6366f1;
     border-radius: 4px;
     left: -4px;
     top: -5px;
@@ -55,18 +55,18 @@
 
 /* Socratic Heatmap Wavy Underlines */
 .smell-security {
-    text-decoration: underline wavy red;
-    background-color: rgba(255, 0, 0, 0.1);
+    text-decoration: underline wavy #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
 }
 
 .smell-performance {
-    text-decoration: underline wavy orange;
-    background-color: rgba(255, 165, 0, 0.1);
+    text-decoration: underline wavy #f59e0b;
+    background-color: rgba(245, 158, 11, 0.1);
 }
 
 .smell-style {
-    text-decoration: underline wavy green;
-    background-color: rgba(0, 128, 0, 0.1);
+    text-decoration: underline wavy #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
 }
 
 /* Tailwind Typography Prose Overrides for strict word-breaking */
@@ -78,4 +78,49 @@
 /* Fix for React Flow Custom Node Tooltip overlap */
 .react-flow__node:hover {
     z-index: 1000 !important;
+}
+
+/* Modern Sleek Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Glassmorphism & Aesthetics */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.glass-panel-dark {
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bg-grid-pattern {
+    background-size: 32px 32px;
+    background-image: 
+        linear-gradient(to right, rgba(99, 102, 241, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(99, 102, 241, 0.04) 1px, transparent 1px);
+}
+
+.bg-radial-gradient {
+    background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 70%);
 }

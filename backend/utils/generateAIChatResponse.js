@@ -16,7 +16,7 @@ export const generateAIChatResponse = async (code, language, question, systemIns
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     // Use models verified to be available in this environment
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-pro-latest"];
+    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.8-flash"];
 
     // Define the Tools for the Agent
     const agentTools = [{
@@ -130,7 +130,7 @@ Answer:
         try {
             const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
             const groqResponse = await groq.chat.completions.create({
-                model: "llama-3.3-70b-versatile",
+                model: "openai/gpt-oss-120b",
                 messages: [
                     { role: "system", content: systemInstruction || "You are an expert software engineer and technical mentor." },
                     { role: "user", content: `Code:\n${code}\n\nQuestion:\n${question}` }

@@ -5,6 +5,8 @@ import { generateAIChatResponse } from "../utils/generateAIChatResponse.js";
 import { executeCodeTool } from "../utils/executeCodeTool.js";
 import { SOCRATIC_PROMPT, PSEUDOCODE_PROMPT, STANDARD_PROMPT } from "../utils/prompts.js";
 import axios from "axios";
+import transporter from "../config/nodemailer.js";
+import { resolveCuratedResources } from "../utils/studyResources.js";
 
 export const logInteraction = async (req, res) => {
     try {
@@ -105,7 +107,7 @@ const runGeminiAgent = async (prompt, code, language) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro-latest"];
+    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.8-flash"];
 
     const agentTools = [{
         functionDeclarations: [{
@@ -196,7 +198,7 @@ const runGroqAgent = async (prompt, code, language) => {
     if (!apiKey) throw new Error("GROQ_API_KEY is missing");
 
     const groq = new Groq({ apiKey });
-    const modelName = "llama-3.3-70b-versatile";
+    const modelName = "openai/gpt-oss-120b";
 
     const agentTools = [{
         type: "function",
@@ -316,8 +318,7 @@ export const autoFixCode = async (req, res) => {
             // Continue with fix even if logging fails
         }
 
-        const prompt = `
-You are an expert ${language} code assistant.
+        const prompt = `You are an expert ${language} code assistant and compiler.
 The user has a "${smellType}" code smell on line ${badLineNumber}.
 
 Here is the full code for context:
@@ -326,42 +327,57 @@ ${code}
 \`\`\`
 
 YOUR TASK:
-Fix the code.
-You MUST use the \`test_code\` tool to verify your fix works by running the entire new script. 
-If it fails, read the error output from the tool and fix your mistake, then test again.
+1. Fix the code so it is 100% syntactically valid, logically correct, optimal, and free of bugs.
+2. If the issue is a multi-line pattern or algorithmic smell (like nested loops that need a hash map), properly rewrite the function/block so the entire code works seamlessly.
+3. You can use the \`test_code\` tool to test your code before finalizing.
 
-CRITICAL INSTRUCTION:
-If the \`smellType\` or hint is completely illogical for line ${badLineNumber} (e.g., asking to change 'let' to 'const' on a function declaration), OR if the line is already perfectly optimal and needs no changes, DO NOT return the original line. 
-Instead, you MUST return exactly this string: NO_FIX_NEEDED
+CRITICAL INSTRUCTIONS:
+- If no fix is needed (e.g., code is already optimal), return {"fixedCode": null, "fixedLine": "NO_FIX_NEEDED", "explanation": "Already optimal"}.
+- Otherwise, return ONLY a raw JSON object matching this schema:
+{
+  "fixedCode": "<the COMPLETE updated code for the file with the fix applied>",
+  "fixedLine": "<summary of the primary changed line/block>",
+  "explanation": "<short 1-sentence explanation of what was improved>"
+}`;
 
-If a fix IS made and passes tests, return ONLY the corrected line of code (the new version of line ${badLineNumber}).
-Do NOT provide markdown formatting (no \`\`\` wrappers).
-Do NOT provide explanations.
-`;
-
-        let fixedLine = "";
+        let rawResult = "";
 
         try {
             // Attempt 1: Gemini (Primary)
             console.log("🤖 Attempting fix with Gemini...");
-            fixedLine = await runGeminiAgent(prompt, code, language);
+            rawResult = await runGeminiAgent(prompt, code, language);
         } catch (geminiError) {
             console.warn(`⚠️ Gemini Failed (${geminiError.message}). Falling back to Groq...`);
 
             try {
                 // Attempt 2: Groq (Secondary)
-                console.log("🧠 Attempting fix with Groq (Llama-3)...");
-                fixedLine = await runGroqAgent(prompt, code, language);
+                console.log("🧠 Attempting fix with Groq...");
+                rawResult = await runGroqAgent(prompt, code, language);
             } catch (groqError) {
                 console.error("❌ Both Gemini and Groq failed.");
                 throw new Error("All AI providers exhausted.");
             }
         }
 
-        // Strip markdown if the AI ignored instructions
-        fixedLine = fixedLine.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
+        // Clean and parse JSON response
+        let fixedCode = null;
+        let fixedLine = "";
+        let explanation = "";
 
-        return res.status(200).json({ fixedLine });
+        try {
+            const parsed = typeof rawResult === 'object' ? rawResult : JSON.parse(rawResult.replace(/```(?:json)?\s*([\s\S]*?)```/i, "$1").trim());
+            fixedCode = parsed.fixedCode || null;
+            fixedLine = parsed.fixedLine || "";
+            explanation = parsed.explanation || "";
+        } catch (_) {
+            // If raw text was returned directly
+            fixedLine = rawResult.replace(/```[a-z]*\n?/g, "").replace(/```/g, "").trim();
+            if (fixedLine.includes("\n")) {
+                fixedCode = fixedLine;
+            }
+        }
+
+        return res.status(200).json({ fixedCode, fixedLine, explanation });
 
     } catch (error) {
         console.error("❌ Auto-Fix Complete Flow Error:", error);
@@ -376,122 +392,246 @@ export const triggerCourseGeneration = async (req, res) => {
     try {
         const { studentName, email, code, jdoodleError, experienceLevel } = req.body;
 
-        if (!code || !jdoodleError) {
-            return res.status(400).json({ error: "Missing required code or error fields." });
+        if (!code) {
+            return res.status(400).json({ error: "Source code is required to generate a study guide." });
         }
 
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ error: "GEMINI_API_KEY is missing." });
-        }
-
-        const courseTool = {
-            name: "provision_ephemeral_bootcamp",
-            description: "Generates a comprehensive study guide blueprint to help a student overcome a coding error.",
-            parameters: {
-                type: "OBJECT",
-                properties: {
-                    identified_weakness: { type: "STRING", description: "The underlying knowledge gap causing the error." },
-                    google_doc_title: { type: "STRING", description: "A catchy, encouraging title for the study guide." },
-                    Youtube_queries: { type: "ARRAY", items: { type: "STRING" }, description: "Search queries to find helpful YouTube videos." },
-                    article_search_queries: { type: "ARRAY", items: { type: "STRING" }, description: "Search queries to find helpful articles/documentation." },
-                    syllabus_outline: { type: "ARRAY", items: { type: "STRING" }, description: "Step-by-step topics the student should learn to master this concept." }
-                },
-                required: ["identified_weakness", "google_doc_title", "Youtube_queries", "article_search_queries", "syllabus_outline"]
-            }
-        };
-
-        const prompt = `You are a Senior Engineering Mentor.
-A student named ${studentName || "Anonymous"} with experience level '${experienceLevel || "beginner"}' has encountered an error in their code.
+        const prompt = `You are an expert coding instructor and computer science curriculum designer.
+A student named ${studentName || "Anonymous"} with experience level '${experienceLevel || "beginner"}' has encountered an error or wants a study guide.
 
 Code:
 \`\`\`
 ${code}
 \`\`\`
 
-Error Output:
+Error / Execution Output:
 \`\`\`
-${jdoodleError}
+${jdoodleError || "General logic / conceptual review requested"}
 \`\`\`
 
-Your goal is to use the provided tool to generate a custom study guide blueprint to help them understand the root cause of their error and learn the underlying concepts.`;
+YOUR TASK:
+Analyze the error and the code. Generate a personalized remediation study guide blueprint.
+Output strictly valid JSON (no markdown, no extra commentary) matching this EXACT schema:
+{
+  "identified_weakness": "Clear 1-2 sentence description of the core conceptual gap or error",
+  "google_doc_title": "${studentName || "Student"} – Study Guide: Remediation Plan",
+  "youtube_search_queries": [
+    "search query 1 for video tutorial",
+    "search query 2 for video tutorial"
+  ],
+  "article_search_queries": [
+    "search query 1 for documentation / article",
+    "search query 2 for documentation / article"
+  ],
+  "syllabus_outline": [
+    "1. Core concept explanation",
+    "2. Hands-on syntax & logic correction",
+    "3. Practice problems & edge-case prevention"
+  ]
+}`;
 
         let blueprint = null;
 
-        try {
-            // Primary route: Gemini function-calling
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-            const chat = model.startChat({
-                tools: [{ functionDeclarations: [courseTool] }]
-            });
-
-            const response = await chat.sendMessage(prompt);
-            const toolCall = response.response.functionCalls()?.[0];
-
-            if (!toolCall || toolCall.name !== "provision_ephemeral_bootcamp") {
-                throw new Error("Gemini failed to return the expected blueprint structure.");
-            }
-
-            blueprint = toolCall.args;
-        } catch (geminiError) {
-            console.warn("⚠️ Gemini failed, falling back to Groq...", geminiError.message);
-
-            const groqApiKey = process.env.GROQ_API_KEY;
-            if (!groqApiKey) {
-                throw new Error("GROQ_API_KEY is missing and Gemini failed.");
-            }
-
-            const groq = new Groq({ apiKey: groqApiKey });
-            const groqResponse = await groq.chat.completions.create({
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                    {
-                        role: "system",
-                        content: "You are an expert coding instructor. Analyze the student's failing code and produce a personalized remediation study guide blueprint. Return strictly valid JSON only (no markdown, no backticks, no extra text) that exactly matches this schema: {\"identified_weakness\":\"string\",\"google_doc_title\":\"string\",\"Youtube_queries\":[\"string\"],\"article_search_queries\":[\"string\"],\"syllabus_outline\":[\"string\"]}."
-                    },
-                    {
-                        role: "user",
-                        content: `Student Name: ${studentName || "Anonymous"}
-Experience Level: ${experienceLevel || "beginner"}
-
-Code:
-${code}
-
-Error Output:
-${jdoodleError}
-
-Generate the JSON blueprint now.`
+        // 1. Try Gemini
+        if (process.env.GEMINI_API_KEY) {
+            try {
+                const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+                const models = ["gemini-3.5-flash-lite", "gemini-2.5-flash"];
+                for (const modelName of models) {
+                    try {
+                        const model = genAI.getGenerativeModel({
+                            model: modelName,
+                            generationConfig: { responseMimeType: "application/json", temperature: 0.2 }
+                        });
+                        const result = await model.generateContent(prompt);
+                        const rawText = result.response.text();
+                        const parsed = JSON.parse(rawText.replace(/```(?:json)?\s*([\s\S]*?)```/i, "$1").trim());
+                        if (parsed && (parsed.identified_weakness || parsed.syllabus_outline)) {
+                            blueprint = parsed;
+                            break;
+                        }
+                    } catch (mErr) {
+                        console.warn(`⚠️ [CourseGen] Gemini ${modelName} failed:`, mErr.message);
                     }
-                ],
-                temperature: 0.3
-            });
-
-            const groqRaw = groqResponse.choices?.[0]?.message?.content || "";
-            const cleanedResponse = groqRaw.replace(/```json/gi, "").replace(/```/g, "").trim();
-            const parsedGroqBlueprint = JSON.parse(cleanedResponse);
-
-            blueprint = parsedGroqBlueprint;
-        }
-        
-        // Post the blueprint mapping via axios to n8n webhook
-        const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || "YOUR_N8N_WEBHOOK_URL_HERE";
-        try {
-            const fallbackEmail = "admin@codementor.com"; // Fallback email
-            await axios.post(N8N_WEBHOOK_URL, {
-                studentName: studentName || "Anonymous",
-                email: email || fallbackEmail,
-                blueprint
-            });
-        } catch (webhookError) {
-            console.error("⚠️ Failed to trigger n8n webhook, but blueprint was generated:", webhookError.message);
-            // Optionally decide if this should fail the whole request. 
-            // Since it's an async background task usually, we just log it.
+                }
+            } catch (geminiError) {
+                console.warn("⚠️ [CourseGen] Gemini route failed:", geminiError.message);
+            }
         }
 
-        return res.status(200).json({ 
-            success: true, 
-            blueprint 
+        // 2. Fast Fallback to Groq
+        if (!blueprint && process.env.GROQ_API_KEY) {
+            try {
+                console.log("🧠 [CourseGen] Querying Groq fallback...");
+                const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+                const groqResponse = await groq.chat.completions.create({
+                    model: "openai/gpt-oss-120b",
+                    messages: [
+                        { role: "system", content: "You are a course blueprint compiler. Output strictly valid JSON." },
+                        { role: "user", content: prompt }
+                    ],
+                    response_format: { type: "json_object" },
+                    temperature: 0.2
+                });
+
+                const rawContent = groqResponse.choices?.[0]?.message?.content || "";
+                blueprint = JSON.parse(rawContent);
+            } catch (groqError) {
+                console.error("❌ [CourseGen] Groq fallback failed:", groqError.message);
+            }
+        }
+
+        // 3. Fallback Heuristic Blueprint if AI unavailable
+        if (!blueprint) {
+            blueprint = {
+                identified_weakness: `Issue detected in ${experienceLevel || "beginner"} code execution. Check loop boundaries, type compatibility, and variable scope.`,
+                google_doc_title: `${studentName || "Student"} – Debugging & Mastery Blueprint`,
+                youtube_search_queries: ["Debugging JavaScript runtime errors", "Understanding array methods and indexing"],
+                article_search_queries: ["MDN Web Docs Common Errors", "JavaScript Data Structures guide"],
+                syllabus_outline: [
+                    "1. Understanding the syntax and execution flow",
+                    "2. Isolating runtime exceptions and off-by-one errors",
+                    "3. Applying defensive coding and input guards"
+                ]
+            };
+        }
+
+        // Normalize property names
+        if (blueprint.Youtube_queries && !blueprint.youtube_search_queries) {
+            blueprint.youtube_search_queries = blueprint.Youtube_queries;
+        }
+
+        // 4. Resolve direct, verified YouTube video URLs & Official Documentation articles
+        const curated = resolveCuratedResources(
+            code,
+            jdoodleError,
+            blueprint.identified_weakness,
+            blueprint.youtube_search_queries,
+            blueprint.article_search_queries
+        );
+
+        blueprint.direct_videos = curated.videos;
+        blueprint.direct_articles = curated.articles;
+
+        // 5. Send direct email to student via Brevo / Nodemailer if email or SMTP is configured
+        let emailDelivered = false;
+        const targetEmail = email || process.env.SENDER_EMAIL;
+        if (targetEmail && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
+            try {
+                const syllabusHtml = (blueprint.syllabus_outline || []).map((step, idx) => `
+                    <li style="margin-bottom: 10px; color: #374151; font-size: 14px; line-height: 1.6;">
+                        <strong>Step ${idx + 1}:</strong> ${step.replace(/^\d+\.\s*/, '')}
+                    </li>
+                `).join('');
+
+                const youtubeLinksHtml = (blueprint.direct_videos || []).map(v => `
+                    <li style="margin-bottom: 10px;">
+                        <a href="${v.url}" 
+                           target="_blank" 
+                           style="color: #dc2626; text-decoration: none; font-weight: 600; font-size: 14px;">
+                           ▶️ Watch: ${v.title} (${v.channel || "YouTube"}) ↗
+                        </a>
+                    </li>
+                `).join('');
+
+                const docLinksHtml = (blueprint.direct_articles || []).map(a => `
+                    <li style="margin-bottom: 10px;">
+                        <a href="${a.url}" 
+                           target="_blank" 
+                           style="color: #4f46e5; text-decoration: none; font-weight: 600; font-size: 14px;">
+                           📖 Read: ${a.title} (${a.source || "Official Docs"}) ↗
+                        </a>
+                    </li>
+                `).join('');
+
+                const mailOptions = {
+                    from: `"Code Mentor AI" <${process.env.SENDER_EMAIL || "sdkeerthigadevi@gmail.com"}>`,
+                    to: targetEmail,
+                    subject: `📚 Your Personalized Code Mentor Study Guide: ${blueprint.google_doc_title || "Remediation Plan"}`,
+                    html: `
+                        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 24px; background-color: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb;">
+                            <div style="background: linear-gradient(135deg, #4f46e5, #7c3aed); padding: 24px; border-radius: 8px; text-align: center; color: #ffffff; margin-bottom: 24px;">
+                                <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">🎓 Code Mentor Custom Study Guide</h1>
+                                <p style="margin: 0; font-size: 14px; opacity: 0.95;">Personalized learning blueprint prepared for <strong>${studentName || "Student"}</strong></p>
+                            </div>
+
+                            <!-- Weakness Section -->
+                            <div style="background-color: #ffffff; border: 1px solid #e0e7ff; border-left: 5px solid #4f46e5; border-radius: 8px; padding: 18px; margin-bottom: 20px;">
+                                <h3 style="margin: 0 0 8px 0; color: #4338ca; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">🎯 Identified Weakness & Root Cause</h3>
+                                <p style="margin: 0; color: #1f2937; font-size: 15px; line-height: 1.6;">
+                                    ${blueprint.identified_weakness}
+                                </p>
+                            </div>
+
+                            <!-- Syllabus Section -->
+                            <div style="background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                                <h3 style="margin: 0 0 14px 0; color: #111827; font-size: 15px; font-weight: 700;">📋 Recommended Learning Syllabus</h3>
+                                <ol style="padding-left: 20px; margin: 0;">
+                                    ${syllabusHtml}
+                                </ol>
+                            </div>
+
+                            <!-- YouTube Tutorials -->
+                            ${blueprint.direct_videos && blueprint.direct_videos.length > 0 ? `
+                            <div style="background-color: #ffffff; border: 1px solid #fee2e2; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                                <h3 style="margin: 0 0 12px 0; color: #991b1b; font-size: 15px; font-weight: 700;">📺 Direct Video Tutorials</h3>
+                                <ul style="padding-left: 20px; margin: 0;">
+                                    ${youtubeLinksHtml}
+                                </ul>
+                            </div>
+                            ` : ''}
+
+                            <!-- Documentation Guides -->
+                            ${blueprint.direct_articles && blueprint.direct_articles.length > 0 ? `
+                            <div style="background-color: #ffffff; border: 1px solid #e0e7ff; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+                                <h3 style="margin: 0 0 12px 0; color: #3730a3; font-size: 15px; font-weight: 700;">📚 Official Documentation & Articles</h3>
+                                <ul style="padding-left: 20px; margin: 0;">
+                                    ${docLinksHtml}
+                                </ul>
+                            </div>
+                            ` : ''}
+
+                            <div style="text-align: center; padding-top: 12px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px;">
+                                <p style="margin: 0 0 4px 0;">Generated automatically by Code Mentor AI Socratic Diagnostics</p>
+                                <p style="margin: 0;">Keep coding and building with confidence! 🚀</p>
+                            </div>
+                        </div>
+                    `
+                };
+
+                await transporter.sendMail(mailOptions);
+                emailDelivered = true;
+                console.log(`✅ [CourseGen] Study guide email successfully dispatched to ${targetEmail}`);
+            } catch (mailError) {
+                console.warn("⚠️ [CourseGen] Direct email dispatch error:", mailError.message);
+            }
+        }
+
+        // 5. Send the blueprint to n8n webhook if configured
+        const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
+        if (N8N_WEBHOOK_URL && !N8N_WEBHOOK_URL.includes("YOUR_N8N")) {
+            try {
+                const fallbackEmail = "admin@codementor.com";
+                await axios.post(N8N_WEBHOOK_URL, {
+                    studentName: studentName || "Anonymous",
+                    email: email || fallbackEmail,
+                    blueprint
+                }, { timeout: 3500 });
+                console.log("✅ [CourseGen] Blueprint dispatched to n8n webhook");
+            } catch (webhookError) {
+                console.warn("ℹ️ [CourseGen] n8n webhook notice (n8n might be offline or inactive):", webhookError.message);
+                // Non-blocking: continue to return blueprint to frontend
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: emailDelivered 
+                ? `Study guide generated and emailed to ${targetEmail}!` 
+                : "Study guide blueprint generated successfully!",
+            emailDelivered,
+            targetEmail,
+            blueprint
         });
 
     } catch (error) {

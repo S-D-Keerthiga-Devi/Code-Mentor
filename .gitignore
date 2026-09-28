@@ -9,3 +9,5 @@ backend/uploads/
 *.pdf
 
 progress.md
+.DS_Store
+*.DS_Store

@@ -6,7 +6,7 @@ dotenv.config();
 
 export const generateAIExplanation = async (code, language) => {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-pro-latest"]; // Validated models
+    const models = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.8-flash"]; // Validated models
 
     // Define the Tools for the Agent
     const agentTools = [{

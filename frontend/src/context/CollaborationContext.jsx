@@ -65,11 +65,15 @@ export const CollaborationProvider = ({ children }) => {
 
         socketRef.current = newSocket;
 
+        newSocket.on("connect_error", (err) => {
+            console.warn("Socket.IO Connection Error:", err.message);
+            setIsConnected(false);
+        });
+
         newSocket.on(EVENTS.CONNECT, () => {
             console.log("Connected to Socket.IO server");
             setIsConnected(true);
 
-            // Auto-rejoin room if we have a current room ID (handles reconnections)
             // Auto-rejoin room if we have a current room ID (handles reconnections)
             const roomId = currentRoomIdRef.current;
             const currentUsername = usernameRef.current || "Anonymous";

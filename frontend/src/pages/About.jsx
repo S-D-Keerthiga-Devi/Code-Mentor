@@ -1,274 +1,247 @@
 import React from 'react';
 import {
-    ShieldCheck,
-    BookOpen,
-    Bug,
-    GraduationCap,
-    BarChart3,
-    Lock,
-    Code,
-    CheckCircle,
-    Sparkles,
-    Target,
-    Heart
+  ShieldCheck,
+  BookOpen,
+  Bug,
+  GraduationCap,
+  BarChart3,
+  Lock,
+  Code,
+  CheckCircle2,
+  Sparkles,
+  Target,
+  Heart,
+  Cpu,
+  Zap,
+  Users,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 const About = () => {
-    const services = [
-        {
-            id: 1,
-            title: "Smart Code Assistant",
-            tagline: "Get safe, tested suggestions instantly",
-            description: "Stuck on a problem? Our AI assistant provides code suggestions that are automatically tested before you see them. No more copy-pasting broken code!",
-            icon: ShieldCheck,
-            color: "indigo",
-            benefits: [
-                "Get hints when you're stuck",
-                "Suggestions are tested automatically",
-                "See exactly what will change",
-                "Know how reliable each suggestion is",
-                "Apply fixes with one click"
-            ],
-            howItWorks: "Ask for help → AI creates a solution → We test it automatically → You see only verified suggestions that actually work"
-        },
-        {
-            id: 2,
-            title: "Course Materials Library",
-            tagline: "AI that knows your coursework",
-            description: "Your instructor's slides, notes, and materials are built into the assistant. Get help that's perfectly aligned with what you're learning in class.",
-            icon: BookOpen,
-            color: "blue",
-            benefits: [
-                "Assistance based on your course content",
-                "References your class materials",
-                "Aligned with what you're learning",
-                "Works with PDFs and slides",
-                "No more generic answers"
-            ],
-            howItWorks: "Your instructor uploads course materials → AI learns from them → You get help that matches your coursework"
-        },
-        {
-            id: 3,
-            title: "Visual Debugging Tools",
-            tagline: "See, hear, and understand your code",
-            description: "Everyone learns differently. Debug your code with animations, audio explanations, written guides, or interactive tools - whatever works best for you.",
-            icon: Bug,
-            color: "purple",
-            benefits: [
-                "Watch your code run step-by-step",
-                "Listen to explanations while coding",
-                "Export debugging reports",
-                "Interactive drag-and-drop learning",
-                "Find common mistakes automatically"
-            ],
-            howItWorks: "Choose your learning style → Run your code → See/hear/interact with what's happening → Understand problems faster"
-        },
-        {
-            id: 4,
-            title: "Personalized Tutoring",
-            tagline: "Help that adapts to your needs",
-            description: "Want to figure it out yourself or need direct help? Choose from guiding questions, helpful hints, or complete solutions with explanations.",
-            icon: GraduationCap,
-            color: "pink",
-            benefits: [
-                "Questions that guide you to answers",
-                "Hints when you need a nudge",
-                "Complete solutions when stuck",
-                "Adapts to your learning style",
-                "Builds problem-solving skills"
-            ],
-            howItWorks: "Pick how much help you want → AI adjusts its teaching style → Get the right amount of guidance → Learn at your own pace"
-        },
-        {
-            id: 5,
-            title: "Progress Insights",
-            tagline: "Track your learning journey",
-            description: "See where you're spending time, when you get stuck, and how you're improving. Instructors can spot students who need extra help.",
-            icon: BarChart3,
-            color: "green",
-            benefits: [
-                "See your progress over time",
-                "Identify challenging topics",
-                "Track AI assistance usage",
-                "Team collaboration insights",
-                "Get help when you're stuck"
-            ],
-            howItWorks: "Your coding sessions are tracked → Patterns are identified → You and your instructor see insights → Get targeted help"
-        },
-        {
-            id: 6,
-            title: "Safety & Security Checks",
-            tagline: "Learn good coding practices",
-            description: "Every suggestion is checked for security issues. Learn not just what works, but what's safe and follows best practices.",
-            icon: Lock,
-            color: "red",
-            benefits: [
-                "Understand why suggestions work",
-                "Catch security vulnerabilities",
-                "Learn safe coding practices",
-                "Get improvement recommendations",
-                "Build secure code from day one"
-            ],
-            howItWorks: "AI creates a suggestion → Security checks run automatically → You see explanations and warnings → Learn safe coding habits"
-        }
-    ];
+  const modules = [
+    {
+      id: 1,
+      title: "Smart Code Assistant & IDE",
+      tagline: "Verified Socratic code auto-fixes",
+      description: "CodeMentor analyzes student code for syntax issues, security smells, and algorithmic inefficiencies, providing verified step-by-step guidance.",
+      icon: ShieldCheck,
+      color: "indigo",
+      benefits: [
+        "Socratic hints that encourage learning",
+        "AST validation and unit test safety checks",
+        "Single-click verified code application",
+        "Interactive line-by-line smell markers"
+      ],
+      howItWorks: "User code is parsed into an AST → Gemini/Groq engines detect smells → Automated test runners verify proposed edits → Safe fixes are presented."
+    },
+    {
+      id: 2,
+      title: "Visual Debugger & Big-O Heatmap",
+      tagline: "Interactive 4D algorithmic pulse simulation",
+      description: "Visualizes code structure and execution flow through animated React Flow graphs with Dagre hierarchical layout and time/space complexity matrices.",
+      icon: Bug,
+      color: "purple",
+      benefits: [
+        "Step-by-step visual pulse along graph edges",
+        "Interactive zoom, pan, and viewport management",
+        "Visual Big-O computational bottleneck markers",
+        "Automatic graph subgraph optimization"
+      ],
+      howItWorks: "Algorithm logic is mapped into directed acyclic graph nodes → Pulse pulses through control branches → Big-O complexity values are computed in real time."
+    },
+    {
+      id: 3,
+      title: "Real-Time Multiplayer Coding",
+      tagline: "Conflict-free CRDT synchronization",
+      description: "Allows students and instructors to code together in real time with shared Monaco editor state, awareness cursors, integrated whiteboard, and chat.",
+      icon: Users,
+      color: "blue",
+      benefits: [
+        "Zero-latency Yjs document synchronization",
+        "Remote user cursor and selection highlights",
+        "Collaborative whiteboard with instant broadcast",
+        "Resilient WebSocket reconnection with fallback"
+      ],
+      howItWorks: "Yjs CRDT models synchronize state over secure WebSockets → Monaco binding maps delta operations → Presence awareness tracks remote cursors."
+    },
+    {
+      id: 4,
+      title: "Course Materials AI Assistant",
+      tagline: "Syllabus-aligned RAG knowledge engine",
+      description: "Instructors upload course PDFs and lecture slides, enabling a domain-specific assistant that answers student questions strictly using course materials.",
+      icon: BookOpen,
+      color: "emerald",
+      benefits: [
+        "Accurate answers grounded in lecture slides",
+        "Direct citations to uploaded course documents",
+        "Instant PDF parsing and knowledge embedding",
+        "Eliminates hallucinated, off-curriculum answers"
+      ],
+      howItWorks: "PDF documents are ingested and chunked → Vector embeddings are stored → User queries perform RAG retrieval for curriculum-accurate answers."
+    }
+  ];
 
-    const getColorClasses = (color) => {
-        const colors = {
-            indigo: 'from-indigo-500 to-indigo-600',
-            blue: 'from-blue-500 to-blue-600',
-            purple: 'from-purple-500 to-purple-600',
-            pink: 'from-pink-500 to-pink-600',
-            green: 'from-green-500 to-green-600',
-            red: 'from-red-500 to-red-600'
-        };
-        return colors[color] || colors.indigo;
-    };
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
+      <Navbar />
 
-    return (
-        <div className="min-h-screen bg-gray-50">
-            <Navbar />
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-slate-900 text-white py-20 sm:py-28 bg-grid-pattern">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-tr from-indigo-500/20 via-purple-500/20 to-pink-500/10 blur-3xl pointer-events-none rounded-full" />
+        
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 space-y-6">
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold text-indigo-200 shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Architecture & Vision</span>
+          </div>
 
-            {/* Hero Section */}
-            <section className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-20">
-                <div className="max-w-7xl mx-auto px-6 text-center">
-                    <div className="inline-flex items-center justify-center p-3 bg-white/20 backdrop-blur-sm rounded-full mb-6">
-                        <Sparkles className="w-8 h-8" />
-                    </div>
-                    <h1 className="text-4xl md:text-5xl font-bold mb-6">
-                        About CodeMentor
-                    </h1>
-                    <p className="text-xl text-indigo-50 max-w-3xl mx-auto leading-relaxed">
-                        We're building the future of coding education with AI-powered tools that make learning faster, safer, and more personalized.
-                    </p>
-                </div>
-            </section>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight">
+            Building the Future of <br />
+            <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
+              Computer Science Education
+            </span>
+          </h1>
 
-            {/* Mission Section */}
-            <section className="py-16 bg-white">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="grid md:grid-cols-2 gap-12 items-center">
-                        <div>
-                            <div className="inline-flex items-center justify-center p-2 bg-indigo-100 rounded-full mb-4">
-                                <Target className="w-6 h-6 text-indigo-600" />
-                            </div>
-                            <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Mission</h2>
-                            <p className="text-lg text-gray-600 leading-relaxed mb-4">
-                                To empower every student with AI-powered coding assistance that's safe, smart, and built specifically for education.
-                            </p>
-                            <p className="text-gray-600 leading-relaxed">
-                                We believe that learning to code should be accessible, engaging, and personalized to each student's needs. Our platform combines cutting-edge AI technology with educational best practices to create tools that truly help students learn.
-                            </p>
-                        </div>
-                        <div>
-                            <div className="inline-flex items-center justify-center p-2 bg-pink-100 rounded-full mb-4">
-                                <Heart className="w-6 h-6 text-pink-600" />
-                            </div>
-                            <h2 className="text-3xl font-bold text-gray-900 mb-4">Why We Built This</h2>
-                            <p className="text-lg text-gray-600 leading-relaxed mb-4">
-                                Traditional coding help is either too generic (online forums) or too slow (waiting for office hours). We wanted something better.
-                            </p>
-                            <p className="text-gray-600 leading-relaxed">
-                                CodeMentor provides instant, personalized help that's grounded in your actual coursework, tested for safety, and designed to help you learn - not just get answers.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* Features Detail Section */}
-            <section className="py-16 bg-gray-50">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="text-center mb-12">
-                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-                            Our Features in Detail
-                        </h2>
-                        <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                            Everything you need to learn coding effectively
-                        </p>
-                    </div>
-
-                    <div className="space-y-12">
-                        {services.map((service, index) => {
-                            const IconComponent = service.icon;
-                            const isEven = index % 2 === 0;
-
-                            return (
-                                <div
-                                    key={service.id}
-                                    className={`bg-white rounded-2xl shadow-lg overflow-hidden ${isEven ? '' : 'md:flex-row-reverse'
-                                        }`}
-                                >
-                                    <div className="md:flex">
-                                        <div className={`md:w-1/3 bg-gradient-to-br ${getColorClasses(service.color)} p-8 flex items-center justify-center`}>
-                                            <div className="text-center text-white">
-                                                <IconComponent className="w-20 h-20 mx-auto mb-4" />
-                                                <h3 className="text-2xl font-bold mb-2">{service.title}</h3>
-                                                <p className="text-sm opacity-90">{service.tagline}</p>
-                                            </div>
-                                        </div>
-                                        <div className="md:w-2/3 p-8">
-                                            <p className="text-gray-700 text-lg mb-6 leading-relaxed">
-                                                {service.description}
-                                            </p>
-
-                                            <div className="mb-6">
-                                                <h4 className="font-semibold text-gray-900 flex items-center mb-3">
-                                                    <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                                                    What You Get:
-                                                </h4>
-                                                <ul className="grid md:grid-cols-2 gap-3">
-                                                    {service.benefits.map((benefit, idx) => (
-                                                        <li key={idx} className="flex items-start text-gray-700">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mr-3 mt-2 flex-shrink-0"></div>
-                                                            <span>{benefit}</span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-
-                                            <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
-                                                <h5 className="font-semibold text-gray-900 text-sm mb-2 flex items-center">
-                                                    <Code className="w-4 h-4 text-indigo-600 mr-2" />
-                                                    How It Works
-                                                </h5>
-                                                <p className="text-sm text-gray-600 leading-relaxed">{service.howItWorks}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            </section>
-
-            {/* CTA Section */}
-            <section className="py-16 bg-white">
-                <div className="max-w-4xl mx-auto px-6 text-center">
-                    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl p-10 text-white shadow-2xl">
-                        <h2 className="text-3xl font-bold mb-4">
-                            Ready to Transform Your Learning?
-                        </h2>
-                        <p className="text-lg text-indigo-50 mb-8">
-                            Join students who are coding smarter with AI-powered assistance
-                        </p>
-                        <a
-                            href="/login"
-                            className="inline-flex items-center bg-white text-indigo-600 px-8 py-4 rounded-xl font-bold hover:bg-gray-100 transition-all duration-200 shadow-xl hover:shadow-2xl"
-                        >
-                            Get Started Now
-                            <Sparkles className="w-5 h-5 ml-2" />
-                        </a>
-                    </div>
-                </div>
-            </section>
-
-            <Footer />
+          <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
+            CodeMentor bridges the gap between static lecture notes and practical coding mastery with real-time multiplayer editing, interactive AST visualization, and verified Socratic AI mentorship.
+          </p>
         </div>
-    );
+      </section>
+
+      {/* Mission & Philosophy */}
+      <section className="py-16 sm:py-20 bg-white border-b border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 items-center">
+            
+            <div className="bg-slate-50 p-8 sm:p-10 rounded-3xl border border-slate-200 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs">
+                <Target className="w-6 h-6" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Our Educational Mission
+              </h2>
+              <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+                Traditional AI tools hand out full solutions without teaching the core concepts. CodeMentor employs Socratic questioning—guiding students step-by-step so they discover solutions independently and retain core principles.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-8 sm:p-10 rounded-3xl border border-slate-200 space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shadow-xs">
+                <Heart className="w-6 h-6" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Safety & Verification
+              </h2>
+              <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+                Every AI suggestion undergoes AST checks and automated unit testing in an isolated environment before being displayed. Students learn secure coding habits from day one.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Detailed Architectural Breakdown */}
+      <section className="py-20 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-3">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+              Platform Architecture in Detail
+            </h2>
+            <p className="text-slate-600 text-sm sm:text-base">
+              A deep look at the specialized modules powering CodeMentor.
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            {modules.map((mod) => {
+              const Icon = mod.icon;
+              return (
+                <div
+                  key={mod.id}
+                  className="bg-white rounded-3xl border border-slate-200 p-8 sm:p-10 shadow-sm hover:shadow-xl transition-all duration-300"
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    
+                    <div className="lg:col-span-5 space-y-4">
+                      <div className="inline-flex p-3 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600">
+                        <Icon className="w-7 h-7" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900">
+                        {mod.title}
+                      </h3>
+                      <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">
+                        {mod.tagline}
+                      </p>
+                      <p className="text-slate-600 text-sm leading-relaxed">
+                        {mod.description}
+                      </p>
+                    </div>
+
+                    <div className="lg:col-span-7 space-y-6">
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider mb-3">
+                          Key Capabilities
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {mod.benefits.map((b, idx) => (
+                            <div key={idx} className="flex items-center space-x-2 text-xs text-slate-600">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                              <span>{b}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1.5">
+                        <div className="font-semibold text-slate-900 flex items-center space-x-1.5">
+                          <Cpu className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Execution Pipeline:</span>
+                        </div>
+                        <p className="text-slate-500 leading-relaxed font-mono text-[11px]">
+                          {mod.howItWorks}
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Footer Banner */}
+      <section className="py-16 bg-white border-t border-slate-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-950 rounded-3xl p-10 sm:p-14 text-white shadow-2xl space-y-6">
+            <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+              Start Coding with CodeMentor Today
+            </h2>
+            <p className="text-indigo-200 text-sm sm:text-base max-w-xl mx-auto">
+              Ready to experience modern Socratic guidance, 4D algorithm debugging, and real-time collaboration?
+            </p>
+            <div>
+              <Link
+                to="/safe-suggest"
+                className="inline-flex items-center space-x-2 bg-white hover:bg-slate-100 text-indigo-950 font-bold px-8 py-3.5 rounded-xl shadow-lg transition-all text-sm"
+              >
+                <span>Launch Smart IDE</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
+    </div>
+  );
 };
 
 export default About;
